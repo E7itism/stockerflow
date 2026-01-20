@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './config/database';
+import authRoutes from './routes/authRoutes';
 
 dotenv.config();
 
@@ -12,9 +13,21 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Test route
+// Routes
+app.use('/api/auth', authRoutes);
+
+// Root route
 app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Welcome to Stocker API' });
+  res.json({
+    message: 'Welcome to Stocker API',
+    endpoints: {
+      auth: {
+        register: 'POST /api/auth/register',
+        login: 'POST /api/auth/login',
+        me: 'GET /api/auth/me',
+      },
+    },
+  });
 });
 
 // Health check route
