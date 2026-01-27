@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './config/database';
 import authRoutes from './routes/authRoutes';
+import productRoutes from './routes/productRoutes';
 
 dotenv.config();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/products', productRoutes);
 
 // Root route
 app.get('/', (req: Request, res: Response) => {
@@ -25,6 +27,13 @@ app.get('/', (req: Request, res: Response) => {
         register: 'POST /api/auth/register',
         login: 'POST /api/auth/login',
         me: 'GET /api/auth/me',
+      },
+      products: {
+        create: 'POST /api/products',
+        getAll: 'GET /api/products',
+        getOne: 'GET /api/products/:id',
+        update: 'PUT /api/products/:id',
+        delete: 'DELETE /api/products/:id',
       },
     },
   });
