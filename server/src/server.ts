@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import pool from './config/database';
 import authRoutes from './routes/authRoutes';
 import productRoutes from './routes/productRoutes';
+import categoryRoutes from './routes/categoryRoutes';
+import supplierRoutes from './routes/supplierRoutes';
 
 dotenv.config();
 
@@ -17,6 +19,8 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/suppliers', supplierRoutes);
 
 // Root route
 app.get('/', (req: Request, res: Response) => {
@@ -34,6 +38,20 @@ app.get('/', (req: Request, res: Response) => {
         getOne: 'GET /api/products/:id',
         update: 'PUT /api/products/:id',
         delete: 'DELETE /api/products/:id',
+      },
+      categories: {
+        create: 'POST /api/categories',
+        getAll: 'GET /api/categories',
+        getOne: 'GET /api/categories/:id',
+        update: 'PUT /api/categories/:id',
+        delete: 'DELETE /api/categories/:id',
+      },
+      suppliers: {
+        create: 'POST /api/suppliers',
+        getAll: 'GET /api/suppliers',
+        getOne: 'GET /api/suppliers/:id',
+        update: 'PUT /api/suppliers/:id',
+        delete: 'DELETE /api/suppliers/:id',
       },
     },
   });
