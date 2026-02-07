@@ -19,7 +19,7 @@ declare global {
 export const authenticateToken = (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   try {
     // Get token from Authorization header
@@ -34,7 +34,7 @@ export const authenticateToken = (
     // Verify token
     const decoded = jwt.verify(
       token,
-      process.env.JWT_SECRET as string
+      process.env.JWT_SECRET as string,
     ) as JwtPayload;
 
     // Attach user info to request

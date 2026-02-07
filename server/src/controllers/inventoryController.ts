@@ -68,7 +68,7 @@ class InventoryController {
        * Type assertion (req as any) because TypeScript doesn't
        * know about our custom req.user property
        */
-      const user_id = (req as any).user?.id;
+      const user_id = (req as any).user?.userId;
 
       // ─────────────────────────────────────────────────────────────
       // STEP 2: VALIDATE REQUIRED FIELDS

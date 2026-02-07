@@ -46,8 +46,7 @@ class InventoryModel {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  // CALCULATE CURRENT STOCK (Most Important!)
-  // ─────────────────────────────────────────────────────────────────
+  // CALCULATE CURRENT STOCK  
   /**
    * HOW IT WORKS:
    * Transaction 1: type='in',  quantity=100  →  +100
