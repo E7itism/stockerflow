@@ -61,11 +61,7 @@ class ProductController {
   async getAll(req: Request, res: Response): Promise<void> {
     try {
       const products = await productModel.findAll();
-
-      res.status(200).json({
-        count: products.length,
-        products,
-      });
+      res.status(200).json(products); // ✅ Just the array
     } catch (error) {
       console.error('Get all products error:', error);
       res.status(500).json({ error: 'Internal server error' });

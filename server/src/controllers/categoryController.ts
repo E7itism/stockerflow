@@ -37,11 +37,7 @@ class CategoryController {
   async getAll(req: Request, res: Response): Promise<void> {
     try {
       const categories = await categoryModel.findAll();
-
-      res.status(200).json({
-        count: categories.length,
-        categories,
-      });
+      res.status(200).json(categories); // ✅ Just the array
     } catch (error) {
       console.error('Get categories error:', error);
       res.status(500).json({ error: 'Internal server error' });

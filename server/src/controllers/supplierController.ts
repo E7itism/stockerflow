@@ -43,15 +43,11 @@ class SupplierController {
   async getAll(req: Request, res: Response): Promise<void> {
     try {
       const suppliers = await supplierModel.findAll();
-
-      res.status(200).json({
-        count: suppliers.length,
-        suppliers,
-      });
+      res.status(200).json(suppliers); // ✅ Just the array
     } catch (error) {
       console.error('Get suppliers error:', error);
       res.status(500).json({ error: 'Internal server error' });
-    }
+    } 
   }
 
   // Get single supplier
