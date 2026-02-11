@@ -47,7 +47,8 @@ export const ProductsPage: React.FC = () => {
       const data = await productsAPI.getAll();
 
       // Extract products array from response object
-      setProducts(data.products || []);
+      console.log(data);
+      setProducts(data);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load products');
     } finally {
