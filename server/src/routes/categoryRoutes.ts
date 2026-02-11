@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import categoryController from '../controllers/categoryController.ts';
+import categoryController from '../controllers/categoryController';
 import { authenticateToken } from '../middleware/authMiddleware';
 
 const router = Router();
