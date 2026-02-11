@@ -1,12 +1,17 @@
 /**
- * Products Page - Manage all products
+ * Products Page - UPDATED to use Layout
+ *
+ * CHANGES:
+ * - Removed <Navbar /> (now in Layout)
+ * - Removed min-h-screen and bg-gray-50 wrapper (now in Layout)
+ * - Wrapped content with Layout component
  */
 
 import React, { useEffect, useState } from 'react';
 import { productsAPI } from '../services/api';
 import { ProductModal } from '../components/Products/ProductModal';
 import { ProductsTable } from '../components/Products/ProductsTable';
-import { Navbar } from '../components/Navbar';
+import { Layout } from '../components/Layout';
 
 export interface Product {
   id: number;
@@ -40,12 +45,9 @@ export const ProductsPage: React.FC = () => {
       setLoading(true);
       setError(null);
       const data = await productsAPI.getAll();
-      console.log('API result:', data);
-      console.log('Is array?', Array.isArray(data));
-      console.log('API Response:', data); // ← ADD THIS
-      console.log('Is Array?', Array.isArray(data)); //
 
-      setProducts(Array.isArray(data) ? data : []);
+      // Extract products array from response object
+      setProducts(data.products || []);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load products');
     } finally {
@@ -89,10 +91,8 @@ export const ProductsPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <Layout>
+      <div className="p-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Products</h1>
@@ -144,6 +144,6 @@ export const ProductsPage: React.FC = () => {
           />
         )}
       </div>
-    </div>
+    </Layout>
   );
 };

@@ -1,61 +1,36 @@
 /**
- * Navbar - Shows user info, navigation, and logout button
+ * Navbar - Top bar with logo, user info, and logout
+ * (Navigation links moved to Sidebar)
  */
 
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 export const Navbar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
-
   return (
-    <nav className="bg-white shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Left side - Logo and Navigation */}
-          <div className="flex items-center space-x-8">
+    <nav className="bg-white shadow-md h-16">
+      <div className="h-full px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-full">
+          {/* Left side - Logo */}
+          <div className="flex items-center">
             <h1 className="text-xl font-bold text-gray-900">📦 STOCKER</h1>
-
-            {/* Navigation Links */}
-            <div className="hidden md:flex space-x-4">
-              <button
-                onClick={() => navigate('/dashboard')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive('/dashboard')
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                📊 Dashboard
-              </button>
-              <button
-                onClick={() => navigate('/products')}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive('/products')
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                📦 Products
-              </button>
-            </div>
+            <span className="ml-3 text-xs text-gray-500 hidden sm:block">
+              Inventory Management System
+            </span>
           </div>
 
           {/* Right side - User info and Logout */}
           <div className="flex items-center space-x-4">
-            <div className="text-sm">
+            <div className="text-sm text-right">
               <p className="text-gray-900 font-medium">
                 {user?.first_name} {user?.last_name}
               </p>

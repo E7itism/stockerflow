@@ -6,7 +6,7 @@ import axios from 'axios';
 import { DashboardData } from '../types/dashboard';
 
 // Base URL for your backend
-const API_URL = 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance
 const api = axios.create({
