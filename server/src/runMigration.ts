@@ -1,16 +1,12 @@
 import pool from './config/database';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const runMigration = async () => {
   try {
     console.log('📦 Running database migration...');
 
-    // Read the SQL file
+    // __dirname is available in CommonJS (no need for fileURLToPath)
     const sqlPath = path.join(__dirname, 'database', 'init.sql');
     const sql = fs.readFileSync(sqlPath, 'utf8');
 
