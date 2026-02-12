@@ -19,7 +19,7 @@ app.use(
     origin: [
       'http://localhost:3000',
       'http://localhost',
-      'stockerflow-gxq6g5lo5-e7itisms-projects.vercel.app ',
+      'https://stockerflow-gxq6g5lo5-e7itisms-projects.vercel.app ',
     ],
     credentials: true,
   }),
