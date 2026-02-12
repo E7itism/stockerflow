@@ -4,10 +4,9 @@
   "description": "",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
     "build": "npx tsc",
-    "start": "node dist/server.js",
     "migrate": "node dist/runMigration.js",
+    "start": "node dist/server.js",
     "deploy": "npm run migrate && npm start"
   },
   "keywords": [],
