@@ -20,6 +20,7 @@ app.use(
       'http://localhost:3000',
       'http://localhost',
       'https://stockerflow-gxq6g5lo5-e7itisms-projects.vercel.app',
+      'https://stockerflow.vercel.app',
     ],
     credentials: true,
   }),
