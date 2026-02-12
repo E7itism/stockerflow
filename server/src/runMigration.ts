@@ -1,25 +1,26 @@
-import pool from './config/database';
+// src/runMigration.ts
 import fs from 'fs';
 import path from 'path';
+import { Pool } from 'pg';
 
 const runMigration = async () => {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }, // Required for cloud connections
+  });
+
   try {
-    console.log('📦 Running database migration...');
+    // This points to the project root, making it environment-agnostic
+    const sqlPath = path.join(process.cwd(), 'src/database/init.sql');
+    const sql = fs.readFileSync(sqlPath, 'utf8');
 
-    // This looks relative to where the process is running (the root)
-    const sql = fs.readFileSync(
-      path.join(process.cwd(), 'src/database/init.sql'),
-      'utf8',
-    );
-
-    // Execute the SQL
     await pool.query(sql);
-
-    console.log('✅ Database migration completed successfully!');
-    process.exit(0);
-  } catch (error) {
-    console.error('❌ Migration failed:', error);
+    console.log('✅ Migration successful');
+  } catch (err) {
+    console.error('❌ Migration failed:', err);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 };
 
