@@ -6,9 +6,11 @@ const runMigration = async () => {
   try {
     console.log('📦 Running database migration...');
 
-    // __dirname is available in CommonJS (no need for fileURLToPath)
-    const sqlPath = path.join(__dirname, 'database', 'init.sql');
-    const sql = fs.readFileSync(sqlPath, 'utf8');
+    // This looks relative to where the process is running (the root)
+    const sql = fs.readFileSync(
+      path.join(process.cwd(), 'src/database/init.sql'),
+      'utf8',
+    );
 
     // Execute the SQL
     await pool.query(sql);
