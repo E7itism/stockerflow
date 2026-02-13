@@ -16,13 +16,23 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost',
-      'https://stockerflow.vercel.app',
-      'https://stockerflow-production.up.railway.app',
-    ],
+    origin: function (origin, callback) {
+      // 1. Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+
+      // 2. Allow localhost and ANY Vercel preview URL
+      if (
+        origin.startsWith('http://localhost') ||
+        origin.endsWith('.vercel.app')
+      ) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
 app.use(express.json());
