@@ -7,6 +7,7 @@ import productRoutes from './routes/productRoutes';
 import categoryRoutes from './routes/categoryRoutes';
 import supplierRoutes from './routes/supplierRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
+import inventoryRoutes from './routes/inventoryRoutes';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // Root route
 app.get('/', (req: Request, res: Response) => {
@@ -74,6 +76,13 @@ app.get('/', (req: Request, res: Response) => {
         getOne: 'GET /api/suppliers/:id',
         update: 'PUT /api/suppliers/:id',
         delete: 'DELETE /api/suppliers/:id',
+      },
+      inventory: {
+        create: 'POST /api/inventory',
+        getAll: 'GET /api/inventory',
+        getOne: 'GET /api/inventory/:id',
+        update: 'PUT /api/inventory/:id',
+        delete: 'DELETE /api/inventory/:id',
       },
     },
   });
