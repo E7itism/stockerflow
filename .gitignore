@@ -11,4 +11,6 @@ client/node_modules/
 # Build outputs
 dist/
 build/
-*.log
+*.loggit add .gitignore
+git commit -m "fix: Remove node_modules from git, update gitignore"
+git push
