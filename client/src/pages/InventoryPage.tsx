@@ -1,0 +1,597 @@
+/**
+ * INVENTORY TRANSACTIONS PAGE - COMPLETE GUIDE
+ *
+ * WHAT THIS PAGE DOES:
+ * - Shows history of all stock movements
+ * - Add stock (receiving new products)
+ * - Remove stock (selling/using products)
+ * - Adjust stock (corrections/counts)
+ * - Filter by product or transaction type
+ *
+ * MORE COMPLEX THAN OTHER PAGES BECAUSE:
+ * - Deals with product relationships
+ * - Calculates running stock totals
+ * - Has different transaction types
+ */
+
+import React, { useEffect, useState } from 'react';
+import { inventoryAPI, productsAPI } from '../services/api';
+import { Layout } from '../components/Layout';
+
+// -----------------------------------------------------------------
+// TYPESCRIPT INTERFACES
+// -----------------------------------------------------------------
+
+/**
+ * Transaction Interface
+ * Represents a single inventory movement
+ */
+interface Transaction {
+  id: number;
+  product_id: number;
+  product_name: string; // Joined from products table
+  sku: string; // Joined from products table
+  transaction_type: 'in' | 'out' | 'adjustment'; // Type of movement
+  quantity: number; // How many units
+  user_name: string; // Who made the transaction
+  notes?: string; // Optional notes
+  created_at: string; // When it happened
+}
+
+/**
+ * Product Interface (simplified)
+ * Just what we need for the dropdown
+ */
+interface Product {
+  id: number;
+  name: string;
+  sku: string;
+  current_stock?: number;
+}
+
+// -----------------------------------------------------------------
+// MAIN COMPONENT
+// -----------------------------------------------------------------
+
+export const InventoryPage: React.FC = () => {
+  // ===============================================================
+  // STATE
+  // ===============================================================
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
+  // Filters
+  const [filterProduct, setFilterProduct] = useState<string>('all');
+  const [filterType, setFilterType] = useState<string>('all');
+
+  // ===============================================================
+  // FETCH DATA
+  // ===============================================================
+
+  /**
+   * useEffect - Fetch on mount
+   * We need both transactions AND products
+   */
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  /**
+   * fetchData
+   *
+   * WHAT IT DOES:
+   * 1. Fetches all transactions from database
+   * 2. Fetches all products (for dropdown)
+   * 3. Runs both at the same time (Promise.all)
+   *
+   * WHY Promise.all?
+   * Instead of waiting for each one sequentially:
+   * - Fetch transactions (wait 500ms)
+   * - Then fetch products (wait 500ms)
+   * Total: 1000ms
+   *
+   * With Promise.all:
+   * - Fetch both at the same time
+   * - Wait for both to finish
+   * Total: 500ms (faster!)
+   */
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch both at the same time
+      const [transactionsData, productsData] = await Promise.all([
+        inventoryAPI.getAllTransactions(),
+        productsAPI.getAll(),
+      ]);
+
+      // Handle response formats (might be wrapped in object)
+      setTransactions(transactionsData.transactions || transactionsData);
+      setProducts(productsData.products || productsData);
+    } catch (err: any) {
+      console.error('Failed to fetch inventory data:', err);
+      setError(err.response?.data?.error || 'Failed to load inventory data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ===============================================================
+  // EVENT HANDLERS
+  // ===============================================================
+
+  const handleAddTransaction = () => {
+    setShowModal(true);
+  };
+
+  const handleSaveTransaction = async () => {
+    setShowModal(false);
+    await fetchData(); // Refresh the list
+  };
+
+  // ===============================================================
+  // FILTERING LOGIC
+  // ===============================================================
+
+  /**
+   * filteredTransactions
+   *
+   * WHAT IT DOES:
+   * Filters transactions based on selected filters
+   *
+   * HOW IT WORKS:
+   * 1. Start with all transactions
+   * 2. If product filter is set, keep only matching product
+   * 3. If type filter is set, keep only matching type
+   *
+   * EXAMPLE:
+   * All transactions: [
+   *   { product_name: "Laptop", type: "in", quantity: 10 },
+   *   { product_name: "Mouse", type: "out", quantity: 5 },
+   *   { product_name: "Laptop", type: "out", quantity: 2 }
+   * ]
+   *
+   * Filter: product = "Laptop", type = "out"
+   * Result: [{ product_name: "Laptop", type: "out", quantity: 2 }]
+   */
+  const filteredTransactions = transactions.filter((transaction) => {
+    // Product filter
+    if (
+      filterProduct !== 'all' &&
+      transaction.product_id.toString() !== filterProduct
+    ) {
+      return false; // This transaction doesn't match, remove it
+    }
+
+    // Type filter
+    if (filterType !== 'all' && transaction.transaction_type !== filterType) {
+      return false; // This transaction doesn't match, remove it
+    }
+
+    return true; // Passed all filters, keep it
+  });
+
+  // ===============================================================
+  // RENDER
+  // ===============================================================
+
+  return (
+    <Layout>
+      <div className="p-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Inventory Transactions
+          </h1>
+          <p className="text-gray-600 mt-1">Track all stock movements</p>
+        </div>
+
+        {/* Filters & Add Button */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+              {/* Product Filter */}
+              <select
+                value={filterProduct}
+                onChange={(e) => setFilterProduct(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Products</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name} ({product.sku})
+                  </option>
+                ))}
+              </select>
+
+              {/* Type Filter */}
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Types</option>
+                <option value="in">Stock In</option>
+                <option value="out">Stock Out</option>
+                <option value="adjustment">Adjustment</option>
+              </select>
+            </div>
+
+            {/* Add Button */}
+            <button
+              onClick={handleAddTransaction}
+              className="w-full lg:w-auto px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+            >
+              + Add Transaction
+            </button>
+          </div>
+        </div>
+
+        {/* Loading/Error/Table */}
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
+        ) : (
+          <TransactionsTable transactions={filteredTransactions} />
+        )}
+
+        {/* Modal */}
+        {showModal && (
+          <TransactionModal
+            products={products}
+            onClose={() => setShowModal(false)}
+            onSave={handleSaveTransaction}
+          />
+        )}
+      </div>
+    </Layout>
+  );
+};
+
+// -----------------------------------------------------------------
+// TRANSACTIONS TABLE
+// -----------------------------------------------------------------
+
+interface TableProps {
+  transactions: Transaction[];
+}
+
+const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
+  /**
+   * getTransactionStyle
+   *
+   * WHAT IT DOES:
+   * Returns colors and icons based on transaction type
+   * - Stock In = Green (receiving new stock)
+   * - Stock Out = Red (selling/using stock)
+   * - Adjustment = Yellow (corrections)
+   */
+  const getTransactionStyle = (type: string) => {
+    switch (type) {
+      case 'in':
+        return {
+          icon: '📥',
+          label: 'Stock In',
+          color: 'text-green-600',
+          bg: 'bg-green-50',
+        };
+      case 'out':
+        return {
+          icon: '📤',
+          label: 'Stock Out',
+          color: 'text-red-600',
+          bg: 'bg-red-50',
+        };
+      case 'adjustment':
+        return {
+          icon: '🔧',
+          label: 'Adjustment',
+          color: 'text-yellow-600',
+          bg: 'bg-yellow-50',
+        };
+      default:
+        return {
+          icon: '📦',
+          label: 'Unknown',
+          color: 'text-gray-600',
+          bg: 'bg-gray-50',
+        };
+    }
+  };
+
+  /**
+   * formatDate
+   *
+   * WHAT IT DOES:
+   * Converts database timestamp to readable format
+   *
+   * INPUT: "2024-02-13T10:30:00Z"
+   * OUTPUT: "Feb 13, 10:30 AM"
+   */
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+  if (transactions.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-16 text-center">
+        <p className="text-gray-500 text-lg">No transactions found</p>
+        <p className="text-gray-400 text-sm mt-2">
+          Add your first transaction to get started
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Date
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Product
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                Type
+              </th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                Quantity
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                User
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Notes
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {transactions.map((transaction) => {
+              const style = getTransactionStyle(transaction.transaction_type);
+
+              return (
+                <tr key={transaction.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {formatDate(transaction.created_at)}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {transaction.product_name}
+                      </p>
+                      <p className="text-xs text-gray-500">{transaction.sku}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span
+                      className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${style.bg} ${style.color}`}
+                    >
+                      <span className="mr-1">{style.icon}</span>
+                      {style.label}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className={`text-sm font-semibold ${style.color}`}>
+                      {transaction.transaction_type === 'out' ? '-' : '+'}
+                      {transaction.quantity}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {transaction.user_name}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {transaction.notes || '-'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// -----------------------------------------------------------------
+// TRANSACTION MODAL
+// -----------------------------------------------------------------
+
+interface ModalProps {
+  products: Product[];
+  onClose: () => void;
+  onSave: () => void;
+}
+
+const TransactionModal: React.FC<ModalProps> = ({
+  products,
+  onClose,
+  onSave,
+}) => {
+  const [formData, setFormData] = useState({
+    product_id: 0,
+    transaction_type: 'in' as 'in' | 'out' | 'adjustment',
+    quantity: 0,
+    notes: '',
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  /**
+   * handleChange - Standard form input handler
+   */
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+
+    /**
+     * Special handling for number fields
+     * - product_id and quantity need to be numbers
+     * - transaction_type stays as string
+     */
+    setFormData({
+      ...formData,
+      [name]:
+        name === 'product_id' || name === 'quantity' ? Number(value) : value,
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validation
+    if (formData.product_id === 0) {
+      setError('Please select a product');
+      return;
+    }
+
+    if (formData.quantity <= 0) {
+      setError('Quantity must be greater than 0');
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      await inventoryAPI.createTransaction(formData);
+      onSave();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to create transaction');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full">
+        <div className="p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            Add Inventory Transaction
+          </h2>
+
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Product Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product *
+              </label>
+              <select
+                name="product_id"
+                value={formData.product_id}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value={0}>Select product...</option>
+                {products.map((product) => (
+                  <option key={product.id} value={product.id}>
+                    {product.name} ({product.sku})
+                    {product.current_stock !== undefined &&
+                      ` - Stock: ${product.current_stock}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Transaction Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Transaction Type *
+              </label>
+              <select
+                name="transaction_type"
+                value={formData.transaction_type}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="in">📥 Stock In (Receiving/Purchase)</option>
+                <option value="out">📤 Stock Out (Sale/Usage)</option>
+                <option value="adjustment">🔧 Adjustment (Correction)</option>
+              </select>
+            </div>
+
+            {/* Quantity */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Quantity *
+              </label>
+              <input
+                type="number"
+                name="quantity"
+                value={formData.quantity}
+                onChange={handleChange}
+                min="1"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="0"
+                required
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Notes
+              </label>
+              <textarea
+                name="notes"
+                value={formData.notes}
+                onChange={handleChange}
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Optional notes..."
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 font-medium"
+              >
+                {loading ? 'Saving...' : 'Add Transaction'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
