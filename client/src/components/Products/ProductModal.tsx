@@ -1,10 +1,20 @@
 /**
- * Product Modal - Add or Edit product
+ * Product Modal - Add or Edit product (REACT 19 COMPATIBLE)
  */
 
 import React, { useState, useEffect } from 'react';
-import { Product } from '../../pages/ProductsPage';
 import { productsAPI, categoriesAPI, suppliersAPI } from '../../services/api';
+
+interface Product {
+  id: number;
+  sku: string;
+  name: string;
+  description?: string;
+  category_id: number;
+  supplier_id: number;
+  unit_price: number;
+  reorder_level: number;
+}
 
 interface Props {
   product: Product | null;
@@ -22,7 +32,7 @@ interface Supplier {
   name: string;
 }
 
-export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
+export const ProductModal = ({ product, onClose, onSave }: Props) => {
   const [formData, setFormData] = useState({
     sku: product?.sku || '',
     name: product?.name || '',
@@ -49,7 +59,6 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
         suppliersAPI.getAll(),
       ]);
 
-      // Handle both array and object responses
       setCategories(
         Array.isArray(categoriesData)
           ? categoriesData
@@ -102,10 +111,10 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+      <div className="bg-white rounded-t-lg sm:rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
             {product ? 'Edit Product' : 'Add New Product'}
           </h2>
 
@@ -116,7 +125,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   SKU *
@@ -126,7 +135,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                   name="sku"
                   value={formData.sku}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   placeholder="PROD-001"
                   required
                 />
@@ -141,7 +150,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   placeholder="Laptop"
                   required
                 />
@@ -157,12 +166,12 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 placeholder="Product description..."
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Category *
@@ -171,7 +180,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                   name="category_id"
                   value={formData.category_id}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   required
                 >
                   <option value={0}>Select category...</option>
@@ -191,7 +200,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                   name="supplier_id"
                   value={formData.supplier_id}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   required
                 >
                   <option value={0}>Select supplier...</option>
@@ -204,7 +213,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Unit Price ($) *
@@ -215,8 +224,8 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                   value={formData.unit_price}
                   onChange={handleChange}
                   step="0.01"
-                  min="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  min={0}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   placeholder="99.99"
                   required
                 />
@@ -232,25 +241,25 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                   value={formData.reorder_level}
                   onChange={handleChange}
                   min="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   placeholder="10"
                   required
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 font-medium"
+                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:bg-blue-700 disabled:bg-blue-300 font-medium"
               >
                 {loading
                   ? 'Saving...'

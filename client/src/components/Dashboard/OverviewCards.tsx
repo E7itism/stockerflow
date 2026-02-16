@@ -1,15 +1,19 @@
 /**
- * Overview Cards - Shows 4 stat cards at the top
+ * Overview Cards - REACT 19 COMPATIBLE
  */
 
 import React from 'react';
-import { OverviewStats } from '../../types/dashboard';
 
 interface Props {
-  stats: OverviewStats;
+  stats: {
+    total_products: number;
+    total_categories: number;
+    total_suppliers: number;
+    low_stock_count: number;
+  };
 }
 
-export const OverviewCards: React.FC<Props> = ({ stats }) => {
+export const OverviewCards = ({ stats }: Props) => {
   const cards = [
     {
       title: 'Total Products',
@@ -38,27 +42,29 @@ export const OverviewCards: React.FC<Props> = ({ stats }) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <>
       {cards.map((card, index) => (
         <div
           key={index}
-          className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+          className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm font-medium">{card.title}</p>
-              <p className="text-3xl font-bold text-gray-800 mt-2">
+              <p className="text-gray-500 text-xs sm:text-sm font-medium uppercase">
+                {card.title}
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-800 mt-1 sm:mt-2">
                 {card.value}
               </p>
             </div>
             <div
-              className={`${card.color} w-12 h-12 rounded-full flex items-center justify-center text-2xl`}
+              className={`${card.color} w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl flex-shrink-0`}
             >
               {card.icon}
             </div>
           </div>
         </div>
       ))}
-    </div>
+    </>
   );
 };

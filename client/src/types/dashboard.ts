@@ -43,10 +43,26 @@ export interface TopProduct {
   transaction_count: number;
 }
 
-export interface DashboardData {
-  overview: OverviewStats;
-  inventory_value: InventoryValue;
-  recent_activity: RecentTransaction[];
-  low_stock_products: LowStockProduct[];
+/**
+ * DashboardData - Main interface for dashboard stats
+ *
+ * UPDATED: Changed from nested to FLAT structure to match backend response
+ *
+ * Backend returns:
+ * {
+ *   total_products: 50,
+ *   total_categories: 10,
+ *   total_suppliers: 8,
+ *   low_stock_count: 3,
+ *   total_inventory_value: 25000,
+ *   top_products: [...]
+ * }
+ */
+export interface DashboardData extends OverviewStats {
+  // Extends OverviewStats (includes total_products, total_categories, total_suppliers, low_stock_count)
+
+  // Additional properties
+  inventory_value: { total_value: number; currency: string };
+
   top_products: TopProduct[];
 }

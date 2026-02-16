@@ -1,45 +1,32 @@
 /**
- * Recent Activity - Shows last 10 transactions
+ * Recent Activity - REACT 19 COMPATIBLE
  */
 
 import React from 'react';
-import { RecentTransaction } from '../../types/dashboard';
 
-interface Props {
-  transactions: RecentTransaction[];
+interface Transaction {
+  id: number;
+  product_name: string;
+  transaction_type: 'in' | 'out' | 'adjustment';
+  quantity: number;
+  created_at: string;
 }
 
-export const RecentActivity: React.FC<Props> = ({ transactions }) => {
-  const getTransactionStyle = (type: string) => {
+interface Props {
+  transactions: Transaction[];
+}
+
+export const RecentActivity = ({ transactions }: Props) => {
+  const getTypeInfo = (type: string) => {
     switch (type) {
       case 'in':
-        return {
-          icon: '📥',
-          color: 'text-green-600',
-          bg: 'bg-green-50',
-          label: 'Stock In',
-        };
+        return { icon: '📥', label: 'Stock In', color: 'text-green-600' };
       case 'out':
-        return {
-          icon: '📤',
-          color: 'text-red-600',
-          bg: 'bg-red-50',
-          label: 'Stock Out',
-        };
+        return { icon: '📤', label: 'Stock Out', color: 'text-red-600' };
       case 'adjustment':
-        return {
-          icon: '🔧',
-          color: 'text-yellow-600',
-          bg: 'bg-yellow-50',
-          label: 'Adjustment',
-        };
+        return { icon: '🔧', label: 'Adjustment', color: 'text-yellow-600' };
       default:
-        return {
-          icon: '📦',
-          color: 'text-gray-600',
-          bg: 'bg-gray-50',
-          label: 'Unknown',
-        };
+        return { icon: '📦', label: 'Unknown', color: 'text-gray-600' };
     }
   };
 
@@ -54,41 +41,41 @@ export const RecentActivity: React.FC<Props> = ({ transactions }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-xl font-bold text-gray-800 mb-4">Recent Activity</h2>
-
+    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+      <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">
+        Recent Activity
+      </h2>
       {transactions.length === 0 ? (
-        <p className="text-gray-500 text-center py-8">No recent activity</p>
+        <p className="text-gray-500 text-center py-8 text-sm sm:text-base">
+          No recent activity
+        </p>
       ) : (
         <div className="space-y-3">
-          {transactions.map((transaction) => {
-            const style = getTransactionStyle(transaction.transaction_type);
-
+          {transactions.slice(0, 5).map((transaction) => {
+            const typeInfo = getTypeInfo(transaction.transaction_type);
             return (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between py-2 border-b last:border-0"
               >
-                <div className="flex items-center space-x-3">
-                  <div
-                    className={`${style.bg} w-10 h-10 rounded-full flex items-center justify-center text-xl`}
-                  >
-                    {style.icon}
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-800">
-                      {transaction.product_name}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {style.label} • {transaction.quantity} units •{' '}
-                      {transaction.user_name}
-                    </p>
+                <div className="flex-1 min-w-0 pr-4">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {transaction.product_name}
+                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-500">
+                      {typeInfo.icon} {typeInfo.label}
+                    </span>
+                    <span className="text-xs text-gray-400 hidden sm:inline">
+                      • {formatDate(transaction.created_at)}
+                    </span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">
-                    {formatDate(transaction.created_at)}
-                  </p>
+                <div
+                  className={`text-sm font-semibold flex-shrink-0 ${typeInfo.color}`}
+                >
+                  {transaction.transaction_type === 'out' ? '-' : '+'}
+                  {transaction.quantity}
                 </div>
               </div>
             );

@@ -1,47 +1,19 @@
-/**
- * INVENTORY TRANSACTIONS PAGE - COMPLETE GUIDE
- *
- * WHAT THIS PAGE DOES:
- * - Shows history of all stock movements
- * - Add stock (receiving new products)
- * - Remove stock (selling/using products)
- * - Adjust stock (corrections/counts)
- * - Filter by product or transaction type
- *
- * MORE COMPLEX THAN OTHER PAGES BECAUSE:
- * - Deals with product relationships
- * - Calculates running stock totals
- * - Has different transaction types
- */
-
 import React, { useEffect, useState } from 'react';
 import { inventoryAPI, productsAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 
-// -----------------------------------------------------------------
-// TYPESCRIPT INTERFACES
-// -----------------------------------------------------------------
-
-/**
- * Transaction Interface
- * Represents a single inventory movement
- */
 interface Transaction {
   id: number;
   product_id: number;
-  product_name: string; // Joined from products table
-  sku: string; // Joined from products table
-  transaction_type: 'in' | 'out' | 'adjustment'; // Type of movement
-  quantity: number; // How many units
-  user_name: string; // Who made the transaction
-  notes?: string; // Optional notes
-  created_at: string; // When it happened
+  product_name: string;
+  sku: string;
+  transaction_type: 'in' | 'out' | 'adjustment';
+  quantity: number;
+  user_name: string;
+  notes?: string;
+  created_at: string;
 }
 
-/**
- * Product Interface (simplified)
- * Just what we need for the dropdown
- */
 interface Product {
   id: number;
   name: string;
@@ -49,68 +21,30 @@ interface Product {
   current_stock?: number;
 }
 
-// -----------------------------------------------------------------
-// MAIN COMPONENT
-// -----------------------------------------------------------------
-
 export const InventoryPage: React.FC = () => {
-  // ===============================================================
-  // STATE
-  // ===============================================================
-
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
 
-  // Filters
   const [filterProduct, setFilterProduct] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
 
-  // ===============================================================
-  // FETCH DATA
-  // ===============================================================
-
-  /**
-   * useEffect - Fetch on mount
-   * We need both transactions AND products
-   */
   useEffect(() => {
     fetchData();
   }, []);
 
-  /**
-   * fetchData
-   *
-   * WHAT IT DOES:
-   * 1. Fetches all transactions from database
-   * 2. Fetches all products (for dropdown)
-   * 3. Runs both at the same time (Promise.all)
-   *
-   * WHY Promise.all?
-   * Instead of waiting for each one sequentially:
-   * - Fetch transactions (wait 500ms)
-   * - Then fetch products (wait 500ms)
-   * Total: 1000ms
-   *
-   * With Promise.all:
-   * - Fetch both at the same time
-   * - Wait for both to finish
-   * Total: 500ms (faster!)
-   */
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Fetch both at the same time
       const [transactionsData, productsData] = await Promise.all([
         inventoryAPI.getAllTransactions(),
         productsAPI.getAll(),
       ]);
 
-      // Handle response formats (might be wrapped in object)
       setTransactions(transactionsData.transactions || transactionsData);
       setProducts(productsData.products || productsData);
     } catch (err: any) {
@@ -121,86 +55,47 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
-  // ===============================================================
-  // EVENT HANDLERS
-  // ===============================================================
-
   const handleAddTransaction = () => {
     setShowModal(true);
   };
 
   const handleSaveTransaction = async () => {
     setShowModal(false);
-    await fetchData(); // Refresh the list
+    await fetchData();
   };
 
-  // ===============================================================
-  // FILTERING LOGIC
-  // ===============================================================
-
-  /**
-   * filteredTransactions
-   *
-   * WHAT IT DOES:
-   * Filters transactions based on selected filters
-   *
-   * HOW IT WORKS:
-   * 1. Start with all transactions
-   * 2. If product filter is set, keep only matching product
-   * 3. If type filter is set, keep only matching type
-   *
-   * EXAMPLE:
-   * All transactions: [
-   *   { product_name: "Laptop", type: "in", quantity: 10 },
-   *   { product_name: "Mouse", type: "out", quantity: 5 },
-   *   { product_name: "Laptop", type: "out", quantity: 2 }
-   * ]
-   *
-   * Filter: product = "Laptop", type = "out"
-   * Result: [{ product_name: "Laptop", type: "out", quantity: 2 }]
-   */
   const filteredTransactions = transactions.filter((transaction) => {
-    // Product filter
     if (
       filterProduct !== 'all' &&
       transaction.product_id.toString() !== filterProduct
     ) {
-      return false; // This transaction doesn't match, remove it
+      return false;
     }
-
-    // Type filter
     if (filterType !== 'all' && transaction.transaction_type !== filterType) {
-      return false; // This transaction doesn't match, remove it
+      return false;
     }
-
-    return true; // Passed all filters, keep it
+    return true;
   });
-
-  // ===============================================================
-  // RENDER
-  // ===============================================================
 
   return (
     <Layout>
-      <div className="p-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Inventory Transactions
           </h1>
-          <p className="text-gray-600 mt-1">Track all stock movements</p>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
+            Track all stock movements
+          </p>
         </div>
 
-        {/* Filters & Add Button */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex flex-col lg:flex-row justify-between items-center gap-4">
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
-              {/* Product Filter */}
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
+          <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 lg:gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
               <select
                 value={filterProduct}
                 onChange={(e) => setFilterProduct(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full sm:flex-1 lg:w-48 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
               >
                 <option value="all">All Products</option>
                 {products.map((product) => (
@@ -210,11 +105,10 @@ export const InventoryPage: React.FC = () => {
                 ))}
               </select>
 
-              {/* Type Filter */}
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full sm:flex-1 lg:w-48 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
               >
                 <option value="all">All Types</option>
                 <option value="in">Stock In</option>
@@ -223,17 +117,15 @@ export const InventoryPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Add Button */}
             <button
               onClick={handleAddTransaction}
-              className="w-full lg:w-auto px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+              className="w-full lg:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:bg-blue-700 transition-colors font-medium text-base"
             >
               + Add Transaction
             </button>
           </div>
         </div>
 
-        {/* Loading/Error/Table */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -241,10 +133,17 @@ export const InventoryPage: React.FC = () => {
         ) : error ? (
           <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
         ) : (
-          <TransactionsTable transactions={filteredTransactions} />
+          <>
+            <div className="hidden md:block">
+              <TransactionsTable transactions={filteredTransactions} />
+            </div>
+
+            <div className="md:hidden">
+              <TransactionsCards transactions={filteredTransactions} />
+            </div>
+          </>
         )}
 
-        {/* Modal */}
         {showModal && (
           <TransactionModal
             products={products}
@@ -257,24 +156,11 @@ export const InventoryPage: React.FC = () => {
   );
 };
 
-// -----------------------------------------------------------------
-// TRANSACTIONS TABLE
-// -----------------------------------------------------------------
-
 interface TableProps {
   transactions: Transaction[];
 }
 
 const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
-  /**
-   * getTransactionStyle
-   *
-   * WHAT IT DOES:
-   * Returns colors and icons based on transaction type
-   * - Stock In = Green (receiving new stock)
-   * - Stock Out = Red (selling/using stock)
-   * - Adjustment = Yellow (corrections)
-   */
   const getTransactionStyle = (type: string) => {
     switch (type) {
       case 'in':
@@ -308,15 +194,6 @@ const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
     }
   };
 
-  /**
-   * formatDate
-   *
-   * WHAT IT DOES:
-   * Converts database timestamp to readable format
-   *
-   * INPUT: "2024-02-13T10:30:00Z"
-   * OUTPUT: "Feb 13, 10:30 AM"
-   */
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
@@ -411,9 +288,123 @@ const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
   );
 };
 
-// -----------------------------------------------------------------
-// TRANSACTION MODAL
-// -----------------------------------------------------------------
+const TransactionsCards: React.FC<TableProps> = ({ transactions }) => {
+  const getTransactionStyle = (type: string) => {
+    switch (type) {
+      case 'in':
+        return {
+          icon: '📥',
+          label: 'Stock In',
+          color: 'text-green-600',
+          bg: 'bg-green-50',
+        };
+      case 'out':
+        return {
+          icon: '📤',
+          label: 'Stock Out',
+          color: 'text-red-600',
+          bg: 'bg-red-50',
+        };
+      case 'adjustment':
+        return {
+          icon: '🔧',
+          label: 'Adjustment',
+          color: 'text-yellow-600',
+          bg: 'bg-yellow-50',
+        };
+      default:
+        return {
+          icon: '📦',
+          label: 'Unknown',
+          color: 'text-gray-600',
+          bg: 'bg-gray-50',
+        };
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+  if (transactions.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-8 text-center">
+        <p className="text-gray-500 text-lg">No transactions found</p>
+        <p className="text-gray-400 text-sm mt-2">
+          Add your first transaction to get started
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {transactions.map((transaction) => {
+        const style = getTransactionStyle(transaction.transaction_type);
+
+        return (
+          <div
+            key={transaction.id}
+            className="bg-white rounded-lg shadow-md p-4"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start gap-3 flex-1">
+                <span className="text-2xl">{style.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900">
+                    {transaction.product_name}
+                  </h3>
+                  <p className="text-xs text-gray-500">{transaction.sku}</p>
+                </div>
+              </div>
+              <span
+                className={`text-lg font-bold ${style.color} ml-2 flex-shrink-0`}
+              >
+                {transaction.transaction_type === 'out' ? '-' : '+'}
+                {transaction.quantity}
+              </span>
+            </div>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Type:</span>
+                <span
+                  className={`px-2 py-1 rounded text-xs font-medium ${style.bg} ${style.color}`}
+                >
+                  {style.label}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">Date:</span>
+                <span className="text-gray-900">
+                  {formatDate(transaction.created_at)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">User:</span>
+                <span className="text-gray-900">{transaction.user_name}</span>
+              </div>
+            </div>
+
+            {transaction.notes && (
+              <div className="mt-3 pt-3 border-t">
+                <p className="text-sm text-gray-600">{transaction.notes}</p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 interface ModalProps {
   products: Product[];
@@ -436,21 +427,12 @@ const TransactionModal: React.FC<ModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  /**
-   * handleChange - Standard form input handler
-   */
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >,
   ) => {
     const { name, value } = e.target;
-
-    /**
-     * Special handling for number fields
-     * - product_id and quantity need to be numbers
-     * - transaction_type stays as string
-     */
     setFormData({
       ...formData,
       [name]:
@@ -461,7 +443,6 @@ const TransactionModal: React.FC<ModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
     if (formData.product_id === 0) {
       setError('Please select a product');
       return;
@@ -485,10 +466,10 @@ const TransactionModal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+      <div className="bg-white rounded-t-lg sm:rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
             Add Inventory Transaction
           </h2>
 
@@ -499,7 +480,6 @@ const TransactionModal: React.FC<ModalProps> = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Product Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Product *
@@ -508,7 +488,7 @@ const TransactionModal: React.FC<ModalProps> = ({
                 name="product_id"
                 value={formData.product_id}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 required
               >
                 <option value={0}>Select product...</option>
@@ -522,7 +502,6 @@ const TransactionModal: React.FC<ModalProps> = ({
               </select>
             </div>
 
-            {/* Transaction Type */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Transaction Type *
@@ -531,7 +510,7 @@ const TransactionModal: React.FC<ModalProps> = ({
                 name="transaction_type"
                 value={formData.transaction_type}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 required
               >
                 <option value="in">📥 Stock In (Receiving/Purchase)</option>
@@ -540,7 +519,6 @@ const TransactionModal: React.FC<ModalProps> = ({
               </select>
             </div>
 
-            {/* Quantity */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Quantity *
@@ -551,13 +529,12 @@ const TransactionModal: React.FC<ModalProps> = ({
                 value={formData.quantity}
                 onChange={handleChange}
                 min="1"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 placeholder="0"
                 required
               />
             </div>
 
-            {/* Notes */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Notes
@@ -567,24 +544,23 @@ const TransactionModal: React.FC<ModalProps> = ({
                 value={formData.notes}
                 onChange={handleChange}
                 rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 placeholder="Optional notes..."
               />
             </div>
 
-            {/* Buttons */}
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 font-medium"
+                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:bg-blue-700 disabled:bg-blue-300 font-medium"
               >
                 {loading ? 'Saving...' : 'Add Transaction'}
               </button>

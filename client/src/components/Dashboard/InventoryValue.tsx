@@ -1,33 +1,33 @@
 /**
- * Inventory Value - Big display of total inventory value
+ * Inventory Value - REACT 19 COMPATIBLE
  */
 
 import React from 'react';
-import { InventoryValue as InventoryValueType } from '../../types/dashboard';
 
 interface Props {
-  inventoryValue: InventoryValueType;
+  total_value: number;
+  currency?: string;
 }
 
-export const InventoryValue: React.FC<Props> = ({ inventoryValue }) => {
-  const formattedValue = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: inventoryValue.currency,
-  }).format(inventoryValue.total_value);
-
+export const InventoryValue = ({
+  total_value,
+  currency,
+}: Props): JSX.Element => {
   return (
-    <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-md p-8 mb-8 text-white">
-      <div className="flex items-center justify-between">
+    <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg shadow-md p-6 sm:p-8">
+      <div className="flex items-center justify-between text-white">
         <div>
-          <p className="text-blue-100 text-sm font-medium mb-2">
+          <p className="text-sm sm:text-base opacity-90 font-medium">
             Total Inventory Value
           </p>
-          <p className="text-5xl font-bold">{formattedValue}</p>
-          <p className="text-blue-100 text-sm mt-2">
-            Current stock value across all products
+          <p className="text-3xl sm:text-4xl font-bold mt-2">
+            {total_value.toLocaleString('en-US', {
+              style: 'currency',
+              currency,
+            })}
           </p>
         </div>
-        <div className="text-6xl opacity-20">💰</div>
+        <div className="text-4xl sm:text-5xl flex-shrink-0">💰</div>
       </div>
     </div>
   );
