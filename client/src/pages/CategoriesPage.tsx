@@ -8,7 +8,7 @@
  * - Touch-friendly spacing
  */
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { categoriesAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 

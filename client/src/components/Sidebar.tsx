@@ -8,7 +8,6 @@
  * - Close button visible on mobile
  */
 
-import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface Props {

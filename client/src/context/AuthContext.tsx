@@ -1,9 +1,4 @@
-/**
- * Auth Context - FIXED VERSION
- * Now properly loads auth state on refresh!
- */
-
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect } from 'react';
 import api from '../services/api';
 
 interface User {

@@ -1,9 +1,3 @@
-/**
- * Recent Activity - REACT 19 COMPATIBLE
- */
-
-import React from 'react';
-
 interface Transaction {
   id: number;
   product_name: string;

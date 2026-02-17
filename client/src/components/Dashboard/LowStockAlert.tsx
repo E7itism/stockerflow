@@ -1,9 +1,3 @@
-/**
- * Low Stock Alert - REACT 19 COMPATIBLE
- */
-
-import React from 'react';
-
 interface LowStockProduct {
   id?: number;
   product_id?: number;

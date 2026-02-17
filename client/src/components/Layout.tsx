@@ -13,7 +13,7 @@
  * - Desktop: Sidebar always visible on left
  */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 

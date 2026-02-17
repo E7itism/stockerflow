@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { suppliersAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 

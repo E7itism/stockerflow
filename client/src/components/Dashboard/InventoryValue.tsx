@@ -1,9 +1,3 @@
-/**
- * Inventory Value - REACT 19 COMPATIBLE
- */
-
-import React from 'react';
-
 interface Props {
   total_value: number;
   currency?: string;

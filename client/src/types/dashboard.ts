@@ -10,7 +10,7 @@ export interface OverviewStats {
 }
 
 export interface InventoryValue {
-  total_value: number;
+  inventory_value: { total_value: number; currency: string };
   currency: string;
 }
 
@@ -58,11 +58,10 @@ export interface TopProduct {
  *   top_products: [...]
  * }
  */
-export interface DashboardData extends OverviewStats {
+export interface DashboardData extends OverviewStats, InventoryValue {
   // Extends OverviewStats (includes total_products, total_categories, total_suppliers, low_stock_count)
 
   // Additional properties
-  inventory_value: { total_value: number; currency: string };
 
   top_products: TopProduct[];
 }

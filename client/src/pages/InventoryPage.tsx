@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { inventoryAPI, productsAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 
@@ -436,19 +436,27 @@ const TransactionModal: React.FC<ModalProps> = ({
     setFormData({
       ...formData,
       [name]:
-        name === 'product_id' || name === 'quantity' ? Number(value) : value,
+        name === 'product_id'
+          ? Number(value)
+          : name === 'quantity'
+            ? value === ''
+              ? ''
+              : value //  keep as string while typing
+            : value,
     });
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const quantity = parseInt(String(formData.quantity)) || 0;
 
     if (formData.product_id === 0) {
       setError('Please select a product');
       return;
     }
 
-    if (formData.quantity <= 0) {
+    if (quantity <= 0) {
+      //
       setError('Quantity must be greater than 0');
       return;
     }
@@ -457,7 +465,10 @@ const TransactionModal: React.FC<ModalProps> = ({
     setLoading(true);
 
     try {
-      await inventoryAPI.createTransaction(formData);
+      await inventoryAPI.createTransaction({
+        ...formData,
+        quantity, // send as number
+      });
       onSave();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to create transaction');
@@ -528,6 +539,7 @@ const TransactionModal: React.FC<ModalProps> = ({
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
+                onFocus={(e) => e.target.select()}
                 min="1"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                 placeholder="0"

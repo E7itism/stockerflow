@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { productsAPI, categoriesAPI, suppliersAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 
@@ -53,9 +53,24 @@ export const ProductsPage: React.FC = () => {
         suppliersAPI.getAll(),
       ]);
 
-      setProducts(productsData.products || productsData);
-      setCategories(categoriesData.categories || categoriesData);
-      setSuppliers(suppliersData.suppliers || suppliersData);
+      const categoriesList = categoriesData.categories || categoriesData;
+      const suppliersList = suppliersData.suppliers || suppliersData;
+      const productsList = productsData.products || productsData;
+
+      // ✅ FIX: Map category_id and supplier_id to names
+      const enrichedProducts = productsList.map((product: Product) => ({
+        ...product,
+        category_name:
+          categoriesList.find((c: Category) => c.id === product.category_id)
+            ?.name || '-',
+        supplier_name:
+          suppliersList.find((s: Supplier) => s.id === product.supplier_id)
+            ?.name || '-',
+      }));
+
+      setProducts(enrichedProducts);
+      setCategories(categoriesList);
+      setSuppliers(suppliersList);
     } catch (err: any) {
       console.error('Failed to fetch data:', err);
       setError(err.response?.data?.error || 'Failed to load products');
@@ -396,12 +411,10 @@ const ProductModal: React.FC<ModalProps> = ({
     setFormData({
       ...formData,
       [name]:
-        name === 'category_id' ||
-        name === 'supplier_id' ||
-        name === 'reorder_level'
+        name === 'category_id' || name === 'supplier_id'
           ? Number(value)
-          : name === 'unit_price'
-            ? parseFloat(value) || 0
+          : name === 'unit_price' || name === 'reorder_level'
+            ? parseFloat(value) || ''
             : value,
     });
   };
@@ -409,13 +422,27 @@ const ProductModal: React.FC<ModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // ✅ Convert strings to numbers before submitting
+    const submitData = {
+      ...formData,
+      unit_price: parseFloat(String(formData.unit_price)) || 0,
+      reorder_level: parseInt(String(formData.reorder_level)) || 0,
+    };
+
+    // Validation
+    if (submitData.unit_price <= 0) {
+      setError('⚠️ Unit price must be greater than 0');
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (product) {
-        await productsAPI.update(product.id, formData);
+        await productsAPI.update(product.id, submitData); // ✅ submitData not formData
       } else {
-        await productsAPI.create(formData);
+        await productsAPI.create(submitData); // ✅ submitData not formData
       }
       onSave();
     } catch (err: any) {
@@ -533,10 +560,11 @@ const ProductModal: React.FC<ModalProps> = ({
                   name="unit_price"
                   value={formData.unit_price}
                   onChange={handleChange}
+                  onFocus={(e) => e.target.select()}
                   step="0.01"
                   min="0"
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                  placeholder="0.00"
+                  placeholder={'0.00'}
                   required
                 />
               </div>
@@ -550,6 +578,7 @@ const ProductModal: React.FC<ModalProps> = ({
                   name="reorder_level"
                   value={formData.reorder_level}
                   onChange={handleChange}
+                  onFocus={(e) => e.target.select()}
                   min="0"
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   placeholder="10"

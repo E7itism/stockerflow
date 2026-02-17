@@ -1,9 +1,3 @@
-/**
- * Top Products Chart - REACT 19 COMPATIBLE
- */
-
-import React from 'react';
-
 interface TopProduct {
   product_id?: number;
   id?: number;

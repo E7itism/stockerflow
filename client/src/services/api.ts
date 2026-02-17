@@ -1,7 +1,3 @@
-/**
- * API Service - Makes calls to the backend
- */
-
 import axios from 'axios';
 import { DashboardData } from '../types/dashboard';
 

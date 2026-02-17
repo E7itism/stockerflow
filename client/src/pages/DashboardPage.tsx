@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { dashboardAPI, inventoryAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 import {
@@ -37,7 +37,7 @@ export const DashboardPage: React.FC = () => {
 
       setDashboardData(statsData);
       setRecentActivity(recentData.transactions || recentData);
-      setLowStockProducts(lowStockData.products || lowStockData);
+      setLowStockProducts(lowStockData.low_stock_products || lowStockData);
     } catch (err: any) {
       console.error('Failed to fetch dashboard data:', err);
       setError(err.response?.data?.error || 'Failed to load dashboard data');

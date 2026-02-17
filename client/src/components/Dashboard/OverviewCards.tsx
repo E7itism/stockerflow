@@ -1,9 +1,3 @@
-/**
- * Overview Cards - REACT 19 COMPATIBLE
- */
-
-import React from 'react';
-
 interface Props {
   stats: {
     total_products: number;

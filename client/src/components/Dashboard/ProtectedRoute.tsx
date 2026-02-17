@@ -1,8 +1,3 @@
-/**
- * Protected Route - Redirects to login if not authenticated
- */
-
-import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
