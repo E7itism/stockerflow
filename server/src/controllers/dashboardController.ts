@@ -1,10 +1,14 @@
 /**
- * Dashboard Controller - Handles dashboard API requests
+ * dashboardController.ts
  *
- * What this does:
- * - Gets all dashboard data from models
- * - Combines it into one response
- * - Sends it back to the frontend
+ * Aggregates data from multiple models into one dashboard response.
+ *
+ * ⚠️ IMPORTANT — Response shape is NESTED:
+ *   res.inventory_value.total_value   correct
+ *   res.total_value                   undefined
+ *
+ * Frontend must access nested properties correctly.
+ * See DashboardPage.tsx for how this is consumed.
  */
 
 import { Request, Response } from 'express';
@@ -14,14 +18,22 @@ import inventoryModel from '../models/inventoryModel';
 class DashboardController {
   async getStats(req: Request, res: Response): Promise<void> {
     try {
-      // Get all the data we need
       const overview = await dashboardModel.getOverviewStats();
       const inventoryValue = await dashboardModel.getInventoryValue();
       const recentActivity = await inventoryModel.getRecentTransactions(10);
       const lowStockProducts = await inventoryModel.getLowStockProducts();
       const topProducts = await dashboardModel.getTopProducts(5);
 
-      // Send it all back as JSON
+      /**
+       * Nested response structure:
+       * {
+       *   overview: { total_products, total_categories, total_suppliers, low_stock_count }
+       *   inventory_value: { total_value, currency }
+       *   recent_activity: [ ...transactions ]
+       *   low_stock_products: [ ...products ]
+       *   top_products: [ ...products ]
+       * }
+       */
       res.status(200).json({
         overview,
         inventory_value: inventoryValue,

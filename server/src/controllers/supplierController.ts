@@ -1,26 +1,29 @@
+/**
+ * supplierController.ts
+ *
+ * CRUD operations for suppliers.
+ * Validates name uniqueness before create and update.
+ */
+
 import { Request, Response } from 'express';
 import supplierModel from '../models/supplierModel';
 
 class SupplierController {
-  // Create supplier
   async create(req: Request, res: Response): Promise<void> {
     try {
       const { name, contact_person, email, phone, address } = req.body;
 
-      // Validate
       if (!name) {
         res.status(400).json({ error: 'Supplier name is required' });
         return;
       }
 
-      // Check if name already exists
       const existingSupplier = await supplierModel.findByName(name);
       if (existingSupplier) {
         res.status(409).json({ error: 'Supplier name already exists' });
         return;
       }
 
-      // Create supplier
       const newSupplier = await supplierModel.create({
         name,
         contact_person,
@@ -39,22 +42,19 @@ class SupplierController {
     }
   }
 
-  // Get all suppliers
   async getAll(req: Request, res: Response): Promise<void> {
     try {
       const suppliers = await supplierModel.findAll();
-      res.status(200).json(suppliers); // ✅ Just the array
+      res.status(200).json(suppliers);
     } catch (error) {
       console.error('Get suppliers error:', error);
       res.status(500).json({ error: 'Internal server error' });
-    } 
+    }
   }
 
-  // Get single supplier
   async getOne(req: Request, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
-
       const supplier = await supplierModel.findById(parseInt(id));
 
       if (!supplier) {
@@ -69,20 +69,18 @@ class SupplierController {
     }
   }
 
-  // Update supplier
   async update(req: Request, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
       const updateData = req.body;
 
-      // Check if supplier exists
       const existingSupplier = await supplierModel.findById(parseInt(id));
       if (!existingSupplier) {
         res.status(404).json({ error: 'Supplier not found' });
         return;
       }
 
-      // If updating name, check it's not already taken
+      // Only check name conflict if the name is actually changing
       if (updateData.name && updateData.name !== existingSupplier.name) {
         const nameExists = await supplierModel.findByName(updateData.name);
         if (nameExists) {
@@ -91,7 +89,6 @@ class SupplierController {
         }
       }
 
-      // Update supplier
       const updatedSupplier = await supplierModel.update(
         parseInt(id),
         updateData,
@@ -107,19 +104,16 @@ class SupplierController {
     }
   }
 
-  // Delete supplier
   async delete(req: Request, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
 
-      // Check if supplier exists
       const existingSupplier = await supplierModel.findById(parseInt(id));
       if (!existingSupplier) {
         res.status(404).json({ error: 'Supplier not found' });
         return;
       }
 
-      // Delete supplier
       const deleted = await supplierModel.delete(parseInt(id));
 
       if (deleted) {

@@ -1,3 +1,12 @@
+/**
+ * server.ts
+ *
+ * Entry point for the Express backend.
+ * Sets up middleware, registers all routes, and starts the server.
+ *
+ * Architecture: Request → CORS → JSON parser → Routes → Controllers → Models → DB
+ */
+
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -9,19 +18,42 @@ import supplierRoutes from './routes/supplierRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import inventoryRoutes from './routes/inventoryRoutes';
 
-dotenv.config();
+dotenv.config(); // Load .env variables into process.env
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+/**
+ * CORS Configuration
+ *
+ * CORS (Cross-Origin Resource Sharing) controls which domains
+ * are allowed to call this API from a browser.
+ *
+ * Why do we need this?
+ * Browsers block requests from one origin (e.g., vercel.app) to a different
+ * origin (e.g., railway.app) unless the server explicitly allows it.
+ * This is a browser security feature called the Same-Origin Policy.
+ *
+ * Why a function instead of a simple origin string?
+ * A static string like `origin: 'https://stocker.vercel.app'` only allows
+ * ONE exact URL. Vercel creates a new preview URL for every deployment
+ * (e.g., stocker-abc123.vercel.app). A function lets us allow ALL of them
+ * with a pattern check instead of hardcoding every URL.
+ *
+ * Why allow requests with no origin?
+ * - curl / Postman requests have no origin header
+ * - Mobile apps have no origin header
+ * - Server-to-server requests have no origin header
+ * These are not browser requests so CORS doesn't apply to them.
+ */
 app.use(
   cors({
     origin: function (origin, callback) {
-      // 1. Allow requests with no origin (like mobile apps or curl)
+      // Allow requests with no origin (mobile apps, curl, Postman)
       if (!origin) return callback(null, true);
 
-      // 2. Allow localhost and ANY Vercel preview URL
+      // Allow any localhost port (development)
+      // Allow any *.vercel.app URL (all Vercel deployments including previews)
       if (
         origin.startsWith('http://localhost') ||
         origin.endsWith('.vercel.app')
@@ -31,22 +63,32 @@ app.use(
         return callback(new Error('Not allowed by CORS'));
       }
     },
-    credentials: true,
+    credentials: true, // Allow cookies and Authorization headers
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 );
+
+// Parse incoming JSON request bodies (req.body)
+// Without this, req.body would be undefined
 app.use(express.json());
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/suppliers', supplierRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/inventory', inventoryRoutes);
+// ─────────────────────────────────────────────
+// ROUTES
+// Each route file handles one resource
+// ─────────────────────────────────────────────
+app.use('/api/auth', authRoutes); // POST /api/auth/login, register
+app.use('/api/products', productRoutes); // CRUD /api/products
+app.use('/api/categories', categoryRoutes); // CRUD /api/categories
+app.use('/api/suppliers', supplierRoutes); // CRUD /api/suppliers
+app.use('/api/dashboard', dashboardRoutes); // GET  /api/dashboard/stats
+app.use('/api/inventory', inventoryRoutes); // CRUD /api/inventory/transactions
 
-// Root route
+/**
+ * Root route — API documentation/discovery.
+ * Useful for developers to see all available endpoints
+ * without reading the source code.
+ */
 app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'Welcome to Stocker API',
@@ -78,27 +120,29 @@ app.get('/', (req: Request, res: Response) => {
         delete: 'DELETE /api/suppliers/:id',
       },
       inventory: {
-        create: 'POST /api/inventory',
-        getAll: 'GET /api/inventory',
-        getOne: 'GET /api/inventory/:id',
-        update: 'PUT /api/inventory/:id',
-        delete: 'DELETE /api/inventory/:id',
+        transactions: 'GET /api/inventory/transactions',
+        createTransaction: 'POST /api/inventory/transactions',
+        lowStock: 'GET /api/inventory/stock/low',
+        recentTransactions: 'GET /api/inventory/transactions/recent',
       },
     },
   });
 });
 
-// Health check route
+/**
+ * Health check — used by Railway/Vercel to verify the server is running.
+ * Also checks database connectivity.
+ * Monitoring tools call this periodically to detect downtime.
+ */
 app.get('/health', async (req: Request, res: Response) => {
   try {
-    await pool.query('SELECT NOW()');
+    await pool.query('SELECT NOW()'); // Simple query to test DB connection
     res.json({ status: 'ok', database: 'connected' });
   } catch (error) {
     res.status(500).json({ status: 'error', database: 'disconnected' });
   }
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

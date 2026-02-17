@@ -1,3 +1,10 @@
+/**
+ * productModel.ts
+ *
+ * Database operations for the products table.
+ * Includes a JOIN with the current_stock VIEW for real-time stock levels.
+ */
+
 import pool from '../config/database';
 
 interface Product {
@@ -34,7 +41,6 @@ interface UpdateProductInput {
 }
 
 class ProductModel {
-  // Create a new product
   async create(productData: CreateProductInput): Promise<Product> {
     const {
       sku,
@@ -62,11 +68,19 @@ class ProductModel {
       reorder_level,
     ];
     const result = await pool.query(query, values);
-
     return result.rows[0];
   }
 
-  // Get all products with current stock
+  /**
+   * findAll — JOINs with the current_stock VIEW.
+   *
+   * current_stock is a database VIEW (defined in init.sql) that calculates
+   * stock levels from inventory_transactions. JOINing here means every product
+   * automatically comes with its live stock count — no separate query needed.
+   *
+   * COALESCE(cs.current_quantity, 0): Products with no transactions return
+   * NULL from the LEFT JOIN. COALESCE converts that to 0.
+   */
   async findAll(): Promise<any[]> {
     const query = `
       SELECT 
@@ -76,12 +90,10 @@ class ProductModel {
       LEFT JOIN current_stock cs ON p.id = cs.product_id
       ORDER BY p.created_at DESC
     `;
-
     const result = await pool.query(query);
     return result.rows;
   }
 
-  // Get single product by ID
   async findById(id: number): Promise<any | null> {
     const query = `
       SELECT 
@@ -91,19 +103,33 @@ class ProductModel {
       LEFT JOIN current_stock cs ON p.id = cs.product_id
       WHERE p.id = $1
     `;
-
     const result = await pool.query(query, [id]);
     return result.rows[0] || null;
   }
 
-  // Get product by SKU
   async findBySKU(sku: string): Promise<Product | null> {
     const query = 'SELECT * FROM products WHERE sku = $1';
     const result = await pool.query(query, [sku]);
     return result.rows[0] || null;
   }
 
-  // Update product
+  /**
+   * update — dynamically builds the UPDATE query based on which fields were provided.
+   *
+   * Why dynamic instead of always updating all fields?
+   * If we always updated every column, a PATCH request that only changes the name
+   * would also overwrite unit_price, sku, etc. with whatever is in the request body
+   * (potentially undefined → NULL in the DB).
+   *
+   * How it works:
+   * - Loop through each field in updateData
+   * - If the field was provided (not undefined), add it to the query
+   * - $1, $2, $3... are placeholders that prevent SQL injection
+   * - paramCount tracks which placeholder number we're at
+   *
+   * Example: updating only name and unit_price produces:
+   *   UPDATE products SET name = $1, unit_price = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3
+   */
   async update(
     id: number,
     productData: UpdateProductInput,
@@ -112,7 +138,6 @@ class ProductModel {
     const values = [];
     let paramCount = 1;
 
-    // Dynamically build UPDATE query based on provided fields
     if (productData.sku !== undefined) {
       fields.push(`sku = $${paramCount++}`);
       values.push(productData.sku);
@@ -142,11 +167,11 @@ class ProductModel {
       values.push(productData.reorder_level);
     }
 
-    // Always update updated_at
+    // Always update updated_at to track when the record was last modified
     fields.push(`updated_at = CURRENT_TIMESTAMP`);
 
+    // Nothing to update (only updated_at would change) — just return current data
     if (fields.length === 1) {
-      // Only updated_at, no actual changes
       return await this.findById(id);
     }
 
@@ -163,7 +188,6 @@ class ProductModel {
     return result.rows[0] || null;
   }
 
-  // Delete product
   async delete(id: number): Promise<boolean> {
     const query = 'DELETE FROM products WHERE id = $1 RETURNING id';
     const result = await pool.query(query, [id]);

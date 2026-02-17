@@ -1,26 +1,29 @@
+/**
+ * categoryController.ts
+ *
+ * CRUD operations for product categories.
+ * Validates name uniqueness before create and update.
+ */
+
 import { Request, Response } from 'express';
 import categoryModel from '../models/categoryModel';
 
 class CategoryController {
-  // Create category
   async create(req: Request, res: Response): Promise<void> {
     try {
       const { name, description } = req.body;
 
-      // Validate
       if (!name) {
         res.status(400).json({ error: 'Category name is required' });
         return;
       }
 
-      // Check if name already exists
       const existingCategory = await categoryModel.findByName(name);
       if (existingCategory) {
         res.status(409).json({ error: 'Category name already exists' });
         return;
       }
 
-      // Create category
       const newCategory = await categoryModel.create({ name, description });
 
       res.status(201).json({
@@ -33,22 +36,19 @@ class CategoryController {
     }
   }
 
-  // Get all categories
   async getAll(req: Request, res: Response): Promise<void> {
     try {
       const categories = await categoryModel.findAll();
-      res.status(200).json(categories); // ✅ Just the array
+      res.status(200).json(categories);
     } catch (error) {
       console.error('Get categories error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }
 
-  // Get single category
   async getOne(req: Request, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
-
       const category = await categoryModel.findById(parseInt(id));
 
       if (!category) {
@@ -63,20 +63,18 @@ class CategoryController {
     }
   }
 
-  // Update category
   async update(req: Request, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
       const updateData = req.body;
 
-      // Check if category exists
       const existingCategory = await categoryModel.findById(parseInt(id));
       if (!existingCategory) {
         res.status(404).json({ error: 'Category not found' });
         return;
       }
 
-      // If updating name, check it's not already taken
+      // Only check name conflict if the name is actually changing
       if (updateData.name && updateData.name !== existingCategory.name) {
         const nameExists = await categoryModel.findByName(updateData.name);
         if (nameExists) {
@@ -85,7 +83,6 @@ class CategoryController {
         }
       }
 
-      // Update category
       const updatedCategory = await categoryModel.update(
         parseInt(id),
         updateData,
@@ -101,19 +98,16 @@ class CategoryController {
     }
   }
 
-  // Delete category
   async delete(req: Request, res: Response): Promise<void> {
     try {
       const id = req.params.id as string;
 
-      // Check if category exists
       const existingCategory = await categoryModel.findById(parseInt(id));
       if (!existingCategory) {
         res.status(404).json({ error: 'Category not found' });
         return;
       }
 
-      // Delete category
       const deleted = await categoryModel.delete(parseInt(id));
 
       if (deleted) {
