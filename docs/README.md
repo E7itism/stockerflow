@@ -20,7 +20,7 @@
 ### Dashboard
 
 ![Dashboard](screenshots/dashboard.PNG)
-![Dashboard Mobile](screenshots/dashboard-mobile.PNG)
+
 
 ### Products (Desktop)
 
@@ -32,6 +32,9 @@
 
 ### Supplier (Desktop)
 ![Supplier](screenshots/supplier.PNG)
+
+### Dashboard (Mobile)
+![Dashboard Mobile](screenshots/dashboard-mobile.PNG)
 
 ### Products (Mobile)
 
