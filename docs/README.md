@@ -10,7 +10,7 @@
 
 | Test Account | Credentials      |
 | ------------ | ---------------- |
-| Email        | demo@stocker.com |
+| Email        | demo@mail.com |
 | Password     | demo123          |
 
 ---
