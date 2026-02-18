@@ -1,11 +1,8 @@
 /**
- * CATEGORIES PAGE - MOBILE RESPONSIVE
+ * CategoriesPage.tsx
  *
- * MOBILE CHANGES:
- * - Cards instead of table on mobile
- * - Full-screen modal on mobile
- * - Stack buttons vertically on small screens
- * - Touch-friendly spacing
+ * CRUD page for product categories.
+ * Desktop: table view | Mobile: card view
  */
 
 import { useEffect, useState } from 'react';
@@ -47,7 +44,7 @@ export const CategoriesPage: React.FC = () => {
   };
 
   const handleAddCategory = () => {
-    setEditingCategory(null);
+    setEditingCategory(null); // null = new category
     setShowModal(true);
   };
 
@@ -57,12 +54,12 @@ export const CategoriesPage: React.FC = () => {
   };
 
   const handleDeleteCategory = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) {
+    if (!window.confirm('Are you sure you want to delete this category?'))
       return;
-    }
 
     try {
       await categoriesAPI.delete(id);
+      // Remove from local state instead of refetching
       setCategories(categories.filter((c) => c.id !== id));
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete category');
@@ -74,6 +71,7 @@ export const CategoriesPage: React.FC = () => {
     await fetchCategories();
   };
 
+  // Client-side filter across name and description
   const filteredCategories = categories.filter(
     (category) =>
       category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -82,16 +80,7 @@ export const CategoriesPage: React.FC = () => {
 
   return (
     <Layout>
-      {/**
-       * Main Container
-       *
-       * RESPONSIVE PADDING:
-       * - p-4: 16px on mobile
-       * - sm:p-6: 24px on small tablets
-       * - lg:p-8: 32px on desktop
-       */}
       <div className="p-4 sm:p-6 lg:p-8">
-        {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Categories
@@ -101,7 +90,6 @@ export const CategoriesPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Search & Add */}
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4">
             <div className="w-full sm:w-96">
@@ -122,7 +110,6 @@ export const CategoriesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Loading/Error/Content */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -149,9 +136,9 @@ export const CategoriesPage: React.FC = () => {
   );
 };
 
-// ================================================================
-// CATEGORIES VIEW - Responsive (Table on desktop, Cards on mobile)
-// ================================================================
+// ─────────────────────────────────────────────
+// RESPONSIVE VIEW SWITCHER
+// ─────────────────────────────────────────────
 
 interface ViewProps {
   categories: Category[];
@@ -177,11 +164,6 @@ const CategoriesView: React.FC<ViewProps> = ({
 
   return (
     <>
-      {/**
-       * DESKTOP TABLE VIEW
-       * Hidden on mobile (hidden)
-       * Shows on medium+ (md:block)
-       */}
       <div className="hidden md:block">
         <CategoriesTable
           categories={categories}
@@ -189,12 +171,6 @@ const CategoriesView: React.FC<ViewProps> = ({
           onDelete={onDelete}
         />
       </div>
-
-      {/**
-       * MOBILE CARDS VIEW
-       * Shows on mobile (block)
-       * Hidden on medium+ (md:hidden)
-       */}
       <div className="md:hidden">
         <CategoriesCards
           categories={categories}
@@ -206,7 +182,10 @@ const CategoriesView: React.FC<ViewProps> = ({
   );
 };
 
-// Desktop Table (same as before)
+// ─────────────────────────────────────────────
+// TABLE (Desktop)
+// ─────────────────────────────────────────────
+
 const CategoriesTable: React.FC<ViewProps> = ({
   categories,
   onEdit,
@@ -263,15 +242,10 @@ const CategoriesTable: React.FC<ViewProps> = ({
   );
 };
 
-/**
- * MOBILE CARDS VIEW
- *
- * WHY CARDS ON MOBILE:
- * - Tables hard to read on small screens
- * - Horizontal scrolling is bad UX
- * - Cards can stack vertically
- * - Touch-friendly buttons
- */
+// ─────────────────────────────────────────────
+// CARDS (Mobile)
+// ─────────────────────────────────────────────
+
 const CategoriesCards: React.FC<ViewProps> = ({
   categories,
   onEdit,
@@ -281,17 +255,12 @@ const CategoriesCards: React.FC<ViewProps> = ({
     <div className="space-y-3">
       {categories.map((category) => (
         <div key={category.id} className="bg-white rounded-lg shadow-md p-4">
-          {/* Category Name */}
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
             {category.name}
           </h3>
-
-          {/* Description */}
           {category.description && (
             <p className="text-sm text-gray-600 mb-4">{category.description}</p>
           )}
-
-          {/* Action Buttons */}
           <div className="flex gap-2">
             <button
               onClick={() => onEdit(category)}
@@ -312,9 +281,9 @@ const CategoriesCards: React.FC<ViewProps> = ({
   );
 };
 
-// ================================================================
-// MODAL - Full screen on mobile
-// ================================================================
+// ─────────────────────────────────────────────
+// MODAL — Add / Edit category
+// ─────────────────────────────────────────────
 
 interface ModalProps {
   category: Category | null;
@@ -327,7 +296,6 @@ const CategoryModal: React.FC<ModalProps> = ({ category, onClose, onSave }) => {
     name: category?.name || '',
     description: category?.description || '',
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -335,10 +303,7 @@ const CategoryModal: React.FC<ModalProps> = ({ category, onClose, onSave }) => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -360,23 +325,7 @@ const CategoryModal: React.FC<ModalProps> = ({ category, onClose, onSave }) => {
   };
 
   return (
-    /**
-     * Modal Overlay
-     *
-     * RESPONSIVE:
-     * - p-0: No padding on mobile (full screen)
-     * - sm:p-4: Padding on tablets+ (centered)
-     */
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      {/**
-       * Modal Box
-       *
-       * RESPONSIVE:
-       * - rounded-t-lg: Round top corners on mobile
-       * - sm:rounded-lg: Round all corners on tablet+
-       * - max-h-[90vh]: Max 90% of viewport height
-       * - overflow-y-auto: Scrollable if content too long
-       */}
       <div className="bg-white rounded-t-lg sm:rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
@@ -400,7 +349,7 @@ const CategoryModal: React.FC<ModalProps> = ({ category, onClose, onSave }) => {
                 value={formData.name}
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="e.g., Electronics"
+                placeholder="e.g., Beverages"
                 required
               />
             </div>
@@ -419,15 +368,6 @@ const CategoryModal: React.FC<ModalProps> = ({ category, onClose, onSave }) => {
               />
             </div>
 
-            {/**
-             * Buttons
-             *
-             * MOBILE:
-             * - Full width, stacked vertically
-             *
-             * TABLET+:
-             * - Side by side, auto width
-             */}
             <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t">
               <button
                 type="button"

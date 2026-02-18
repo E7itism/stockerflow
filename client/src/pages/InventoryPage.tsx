@@ -1,3 +1,15 @@
+/**
+ * InventoryPage.tsx
+ *
+ * Displays all stock movement transactions and allows adding new ones.
+ * Supports filtering by product and transaction type.
+ *
+ * Design decision: No delete button.
+ * Transactions are permanent like a financial ledger.
+ * Mistakes are corrected by adding an Adjustment transaction,
+ * which keeps the full history intact for auditing.
+ */
+
 import { useEffect, useState } from 'react';
 import { inventoryAPI, productsAPI } from '../services/api';
 import { Layout } from '../components/Layout';
@@ -40,6 +52,7 @@ export const InventoryPage: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      // Fetch transactions and products in parallel
       const [transactionsData, productsData] = await Promise.all([
         inventoryAPI.getAllTransactions(),
         productsAPI.getAll(),
@@ -55,15 +68,16 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
-  const handleAddTransaction = () => {
-    setShowModal(true);
-  };
-
   const handleSaveTransaction = async () => {
     setShowModal(false);
-    await fetchData();
+    await fetchData(); // Refresh list after adding a transaction
   };
 
+  /**
+   * Client-side filtering — no extra API calls needed.
+   * Both filters can be active at the same time.
+   * Returning false from any condition excludes the transaction.
+   */
   const filteredTransactions = transactions.filter((transaction) => {
     if (
       filterProduct !== 'all' &&
@@ -89,6 +103,7 @@ export const InventoryPage: React.FC = () => {
           </p>
         </div>
 
+        {/* Filters + Add button */}
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
           <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3 lg:gap-4">
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
@@ -118,7 +133,7 @@ export const InventoryPage: React.FC = () => {
             </div>
 
             <button
-              onClick={handleAddTransaction}
+              onClick={() => setShowModal(true)}
               className="w-full lg:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:bg-blue-700 transition-colors font-medium text-base"
             >
               + Add Transaction
@@ -134,10 +149,11 @@ export const InventoryPage: React.FC = () => {
           <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
         ) : (
           <>
+            {/* Desktop: table */}
             <div className="hidden md:block">
               <TransactionsTable transactions={filteredTransactions} />
             </div>
-
+            {/* Mobile: cards */}
             <div className="md:hidden">
               <TransactionsCards transactions={filteredTransactions} />
             </div>
@@ -156,11 +172,16 @@ export const InventoryPage: React.FC = () => {
   );
 };
 
+// ─────────────────────────────────────────────
+// TABLE (Desktop)
+// ─────────────────────────────────────────────
+
 interface TableProps {
   transactions: Transaction[];
 }
 
 const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
+  // Maps transaction type to display icon, label, and color classes
   const getTransactionStyle = (type: string) => {
     switch (type) {
       case 'in':
@@ -195,8 +216,7 @@ const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
+    return new Date(dateString).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -221,42 +241,35 @@ const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Date
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Product
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                Type
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                Quantity
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                User
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Notes
-              </th>
+              {['Date', 'Product', 'Type', 'Quantity', 'User', 'Notes'].map(
+                (h) => (
+                  <th
+                    key={h}
+                    className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${
+                      h === 'Type' || h === 'Quantity'
+                        ? 'text-center'
+                        : 'text-left'
+                    } ${h === 'Quantity' ? 'text-right' : ''}`}
+                  >
+                    {h}
+                  </th>
+                ),
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {transactions.map((transaction) => {
               const style = getTransactionStyle(transaction.transaction_type);
-
               return (
                 <tr key={transaction.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-600">
                     {formatDate(transaction.created_at)}
                   </td>
                   <td className="px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {transaction.product_name}
-                      </p>
-                      <p className="text-xs text-gray-500">{transaction.sku}</p>
-                    </div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {transaction.product_name}
+                    </p>
+                    <p className="text-xs text-gray-500">{transaction.sku}</p>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span
@@ -267,6 +280,7 @@ const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
+                    {/* Show + for in/adjustment, - for out */}
                     <span className={`text-sm font-semibold ${style.color}`}>
                       {transaction.transaction_type === 'out' ? '-' : '+'}
                       {transaction.quantity}
@@ -287,6 +301,10 @@ const TransactionsTable: React.FC<TableProps> = ({ transactions }) => {
     </div>
   );
 };
+
+// ─────────────────────────────────────────────
+// CARDS (Mobile)
+// ─────────────────────────────────────────────
 
 const TransactionsCards: React.FC<TableProps> = ({ transactions }) => {
   const getTransactionStyle = (type: string) => {
@@ -323,8 +341,7 @@ const TransactionsCards: React.FC<TableProps> = ({ transactions }) => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
+    return new Date(dateString).toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -347,7 +364,6 @@ const TransactionsCards: React.FC<TableProps> = ({ transactions }) => {
     <div className="space-y-3">
       {transactions.map((transaction) => {
         const style = getTransactionStyle(transaction.transaction_type);
-
         return (
           <div
             key={transaction.id}
@@ -380,14 +396,12 @@ const TransactionsCards: React.FC<TableProps> = ({ transactions }) => {
                   {style.label}
                 </span>
               </div>
-
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">Date:</span>
                 <span className="text-gray-900">
                   {formatDate(transaction.created_at)}
                 </span>
               </div>
-
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">User:</span>
                 <span className="text-gray-900">{transaction.user_name}</span>
@@ -406,6 +420,10 @@ const TransactionsCards: React.FC<TableProps> = ({ transactions }) => {
   );
 };
 
+// ─────────────────────────────────────────────
+// MODAL — Add Transaction
+// ─────────────────────────────────────────────
+
 interface ModalProps {
   products: Product[];
   onClose: () => void;
@@ -420,7 +438,7 @@ const TransactionModal: React.FC<ModalProps> = ({
   const [formData, setFormData] = useState({
     product_id: 0,
     transaction_type: 'in' as 'in' | 'out' | 'adjustment',
-    quantity: 0,
+    quantity: '' as number | string, // starts empty so user doesn't have to clear 0
     notes: '',
   });
 
@@ -441,22 +459,22 @@ const TransactionModal: React.FC<ModalProps> = ({
           : name === 'quantity'
             ? value === ''
               ? ''
-              : value //  keep as string while typing
+              : value // keep as string while typing, convert at submit
             : value,
     });
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Convert quantity string → number only at submit time
     const quantity = parseInt(String(formData.quantity)) || 0;
 
     if (formData.product_id === 0) {
       setError('Please select a product');
       return;
     }
-
     if (quantity <= 0) {
-      //
       setError('Quantity must be greater than 0');
       return;
     }
@@ -539,10 +557,10 @@ const TransactionModal: React.FC<ModalProps> = ({
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
-                onFocus={(e) => e.target.select()}
+                onFocus={(e) => e.target.select()} // select all on click for easy overwrite
                 min="1"
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="0"
+                placeholder="Enter quantity"
                 required
               />
             </div>

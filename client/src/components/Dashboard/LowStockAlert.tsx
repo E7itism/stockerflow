@@ -1,4 +1,14 @@
+/**
+ * LowStockAlert.tsx
+ *
+ * Displays a warning card for products that have fallen at or below their reorder level.
+ * Renders nothing if there are no low stock items (returns null).
+ *
+ * Used in: DashboardPage (full width, bottom of page)
+ */
+
 interface LowStockProduct {
+  // id or product_id — API may return either depending on the endpoint
   id?: number;
   product_id?: number;
   sku: string;
@@ -12,8 +22,14 @@ interface Props {
 }
 
 export const LowStockAlert = ({ products }: Props) => {
+  /**
+   * Defensive check — products prop can arrive as undefined, null, or an array.
+   * This happens because the dashboard fetches data async and passes it down
+   * before it's ready. Using Array.isArray prevents a runtime crash.
+   */
   const safeProducts = Array.isArray(products) ? products : [];
 
+  // No low stock items — don't render anything, not even an empty card
   if (safeProducts.length === 0) {
     return null;
   }
@@ -33,15 +49,18 @@ export const LowStockAlert = ({ products }: Props) => {
         </div>
       </div>
 
+      {/* Desktop: grid layout */}
       <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {safeProducts.map((product, index) => (
           <ProductCard
+            // Use id or product_id — API returns different shapes from different endpoints
             key={product.id || product.product_id || index}
             product={product}
           />
         ))}
       </div>
 
+      {/* Mobile: stacked list */}
       <div className="sm:hidden space-y-3">
         {safeProducts.map((product, index) => (
           <ProductCard
@@ -54,6 +73,10 @@ export const LowStockAlert = ({ products }: Props) => {
   );
 };
 
+/**
+ * ProductCard — individual low stock item.
+ * Shows current stock vs reorder level so the user knows how urgent it is.
+ */
 const ProductCard = ({ product }: { product: LowStockProduct }) => {
   return (
     <div className="bg-white rounded-lg p-3 sm:p-4 border border-red-200">
@@ -64,12 +87,13 @@ const ProductCard = ({ product }: { product: LowStockProduct }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500">Stock:</span>
+          {/* Red text to emphasize the low number */}
           <span className="text-sm font-bold text-red-600">
             {product.current_stock}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Reorder:</span>
+          <span className="text-xs text-gray-500">Reorder at:</span>
           <span className="text-sm font-medium text-gray-700">
             {product.reorder_level}
           </span>

@@ -1,3 +1,10 @@
+/**
+ * SuppliersPage.tsx
+ *
+ * CRUD page for product suppliers.
+ * Desktop: table view | Mobile: card view
+ */
+
 import { useEffect, useState } from 'react';
 import { suppliersAPI } from '../services/api';
 import { Layout } from '../components/Layout';
@@ -49,9 +56,8 @@ export const SuppliersPage: React.FC = () => {
   };
 
   const handleDeleteSupplier = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this supplier?')) {
+    if (!window.confirm('Are you sure you want to delete this supplier?'))
       return;
-    }
 
     try {
       await suppliersAPI.delete(id);
@@ -66,6 +72,7 @@ export const SuppliersPage: React.FC = () => {
     await fetchSuppliers();
   };
 
+  // Client-side filter by name and email
   const filteredSuppliers = suppliers.filter(
     (supplier) =>
       supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -119,7 +126,6 @@ export const SuppliersPage: React.FC = () => {
                 onDelete={handleDeleteSupplier}
               />
             </div>
-
             <div className="md:hidden">
               <SuppliersCards
                 suppliers={filteredSuppliers}
@@ -141,6 +147,10 @@ export const SuppliersPage: React.FC = () => {
     </Layout>
   );
 };
+
+// ─────────────────────────────────────────────
+// TABLE (Desktop)
+// ─────────────────────────────────────────────
 
 interface TableProps {
   suppliers: Supplier[];
@@ -170,21 +180,16 @@ const SuppliersTable: React.FC<TableProps> = ({
         <table className="w-full">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Email
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Phone
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Address
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                Actions
-              </th>
+              {['Name', 'Email', 'Phone', 'Address', 'Actions'].map((h) => (
+                <th
+                  key={h}
+                  className={`px-6 py-3 text-xs font-medium text-gray-500 uppercase ${
+                    h === 'Actions' ? 'text-center' : 'text-left'
+                  }`}
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -227,6 +232,10 @@ const SuppliersTable: React.FC<TableProps> = ({
   );
 };
 
+// ─────────────────────────────────────────────
+// CARDS (Mobile)
+// ─────────────────────────────────────────────
+
 const SuppliersCards: React.FC<TableProps> = ({
   suppliers,
   onEdit,
@@ -256,14 +265,12 @@ const SuppliersCards: React.FC<TableProps> = ({
               <span className="text-gray-500 w-16 flex-shrink-0">Email:</span>
               <span className="text-gray-900">{supplier.email}</span>
             </div>
-
             {supplier.phone && (
               <div className="flex items-start">
                 <span className="text-gray-500 w-16 flex-shrink-0">Phone:</span>
                 <span className="text-gray-900">{supplier.phone}</span>
               </div>
             )}
-
             {supplier.address && (
               <div className="flex items-start">
                 <span className="text-gray-500 w-16 flex-shrink-0">
@@ -294,6 +301,10 @@ const SuppliersCards: React.FC<TableProps> = ({
   );
 };
 
+// ─────────────────────────────────────────────
+// MODAL — Add / Edit supplier
+// ─────────────────────────────────────────────
+
 interface ModalProps {
   supplier: Supplier | null;
   onClose: () => void;
@@ -307,7 +318,6 @@ const SupplierModal: React.FC<ModalProps> = ({ supplier, onClose, onSave }) => {
     phone: supplier?.phone || '',
     address: supplier?.address || '',
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -315,10 +325,7 @@ const SupplierModal: React.FC<ModalProps> = ({ supplier, onClose, onSave }) => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -364,7 +371,7 @@ const SupplierModal: React.FC<ModalProps> = ({ supplier, onClose, onSave }) => {
                 value={formData.name}
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="e.g., Tech Direct"
+                placeholder="e.g., ABC Distributors"
                 required
               />
             </div>
@@ -394,7 +401,7 @@ const SupplierModal: React.FC<ModalProps> = ({ supplier, onClose, onSave }) => {
                 value={formData.phone}
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="+1-555-0100"
+                placeholder="09171234567"
               />
             </div>
 
@@ -408,7 +415,7 @@ const SupplierModal: React.FC<ModalProps> = ({ supplier, onClose, onSave }) => {
                 onChange={handleChange}
                 rows={3}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="123 Business St, City, State"
+                placeholder="Quezon City, Metro Manila"
               />
             </div>
 

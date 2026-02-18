@@ -1,10 +1,36 @@
+/**
+ * api.ts
+ *
+ * Central file for ALL API calls in the app.
+ * Built on top of axios with automatic auth token injection.
+ *
+ * Why one file for all API calls?
+ * - Single place to change the base URL (dev vs production)
+ * - Auth header added once via interceptor, not repeated everywhere
+ * - Easy to find any API call in the codebase
+ * - Consistent error handling pattern across all requests
+ */
+
 import axios from 'axios';
 import { DashboardData } from '../types/dashboard';
 
-// Base URL for your backend
+/**
+ * Base URL comes from environment variable.
+ *
+ * Why use an env variable instead of hardcoding?
+ * - Development: http://localhost:5000/api
+ * - Production: https://your-api.railway.app/api
+ * Setting REACT_APP_API_URL in .env means we never change this file.
+ */
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-// Create axios instance
+/**
+ * Axios instance with shared config.
+ *
+ * Why create an instance instead of using axios directly?
+ * The instance carries the baseURL and default headers,
+ * so every call in this file writes `/products` not the full URL.
+ */
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -12,7 +38,17 @@ const api = axios.create({
   },
 });
 
-// Add token to every request
+/**
+ * Request interceptor — automatically attaches JWT token to every request.
+ *
+ * Why an interceptor instead of adding headers in each function?
+ * Without this, every single API call would need:
+ *   headers: { Authorization: `Bearer ${token}` }
+ * The interceptor runs before every request so we write it once here.
+ *
+ * Token is read from localStorage on each request (not cached in memory)
+ * so it always reflects the latest value after login/logout.
+ */
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -22,9 +58,17 @@ api.interceptors.request.use((config) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// DASHBOARD API
+// DASHBOARD
 // ═══════════════════════════════════════════════════════════════════
+
 export const dashboardAPI = {
+  /**
+   * Returns a NESTED object — not flat!
+   * Access values like:
+   *   data.overview.total_products       ✅
+   *   data.inventory_value.total_value   ✅
+   *   data.total_products                ❌ undefined
+   */
   getStats: async (): Promise<DashboardData> => {
     const response = await api.get<DashboardData>('/dashboard/stats');
     return response.data;
@@ -32,8 +76,14 @@ export const dashboardAPI = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// PRODUCTS API
+// PRODUCTS
 // ═══════════════════════════════════════════════════════════════════
+
+/**
+ * What we send TO the API when creating or updating a product.
+ * unit_price and reorder_level are always numbers here (never strings).
+ * The form uses a separate ProductFormData type that allows strings while typing.
+ */
 export interface ProductInput {
   sku: string;
   name: string;
@@ -45,9 +95,12 @@ export interface ProductInput {
 }
 
 export const productsAPI = {
+  /**
+   * Returns products enriched with category_name, supplier_name, current_stock.
+   * current_stock is calculated from inventory_transactions in the DB view.
+   */
   getAll: async () => {
     const response = await api.get('/products');
-
     return response.data;
   },
 
@@ -61,6 +114,7 @@ export const productsAPI = {
     return response.data;
   },
 
+  // Partial<ProductInput> means all fields are optional in an update
   update: async (id: number, data: Partial<ProductInput>) => {
     const response = await api.put(`/products/${id}`, data);
     return response.data;
@@ -73,8 +127,9 @@ export const productsAPI = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// CATEGORIES API
+// CATEGORIES
 // ═══════════════════════════════════════════════════════════════════
+
 export interface CategoryInput {
   name: string;
   description?: string;
@@ -108,8 +163,9 @@ export const categoriesAPI = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// SUPPLIERS API
+// SUPPLIERS
 // ═══════════════════════════════════════════════════════════════════
+
 export interface SupplierInput {
   name: string;
   email: string;
@@ -145,8 +201,9 @@ export const suppliersAPI = {
 };
 
 // ═══════════════════════════════════════════════════════════════════
-// INVENTORY API
+// INVENTORY
 // ═══════════════════════════════════════════════════════════════════
+
 export interface TransactionInput {
   product_id: number;
   transaction_type: 'in' | 'out' | 'adjustment';
@@ -155,7 +212,6 @@ export interface TransactionInput {
 }
 
 export const inventoryAPI = {
-  // Transactions
   getAllTransactions: async () => {
     const response = await api.get('/inventory/transactions');
     return response.data;
@@ -166,6 +222,17 @@ export const inventoryAPI = {
     return response.data;
   },
 
+  /**
+   * Creates a stock movement record.
+   * transaction_type effects on stock:
+   *   'in'         → adds stock  (+quantity)
+   *   'out'        → removes stock (-quantity)
+   *   'adjustment' → corrects stock (±quantity)
+   *
+   * Transactions are permanent — no delete endpoint by design.
+   * To correct a mistake, create an opposing transaction instead.
+   * This preserves a full audit trail.
+   */
   createTransaction: async (data: TransactionInput) => {
     const response = await api.post('/inventory/transactions', data);
     return response.data;
@@ -176,7 +243,6 @@ export const inventoryAPI = {
     return response.data;
   },
 
-  // Stock levels
   getProductStock: async (productId: number) => {
     const response = await api.get(`/inventory/products/${productId}/stock`);
     return response.data;
@@ -187,12 +253,16 @@ export const inventoryAPI = {
     return response.data;
   },
 
+  /**
+   * Returns products where current_stock <= reorder_level.
+   * Used by Dashboard (LowStockAlert) and Inventory page.
+   * Response shape: { count: number, low_stock_products: [...] }
+   */
   getLowStock: async () => {
     const response = await api.get('/inventory/stock/low');
     return response.data;
   },
 
-  // Recent activity
   getRecentTransactions: async (limit: number = 10) => {
     const response = await api.get(
       `/inventory/transactions/recent?limit=${limit}`,

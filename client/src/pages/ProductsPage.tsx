@@ -1,3 +1,14 @@
+/**
+ * ProductsPage.tsx
+ *
+ * Full CRUD page for managing products.
+ * Fetches products, categories, and suppliers together so the UI
+ * can show names instead of raw IDs.
+ *
+ * Desktop: table view | Mobile: card view
+ * Modal: shared for both Add and Edit
+ */
+
 import { useEffect, useState } from 'react';
 import { productsAPI, categoriesAPI, suppliersAPI } from '../services/api';
 import { Layout } from '../components/Layout';
@@ -42,6 +53,24 @@ export const ProductsPage: React.FC = () => {
     fetchData();
   }, []);
 
+  /**
+   * Fetches products, categories, and suppliers in parallel.
+   *
+   * Why fetch all 3 together?
+   * Products only store category_id and supplier_id (foreign keys).
+   * To show "Beverages" instead of "3", we need the categories list.
+   * Promise.all runs all 3 requests simultaneously — faster than sequential awaits.
+   *
+   * Why || fallback on each response?
+   * Different API responses may wrap data differently:
+   *   categoriesData.categories  → if backend returns { categories: [...] }
+   *   categoriesData             → if backend returns the array directly
+   * The fallback handles both shapes safely.
+   *
+   * Why enrich products with category_name and supplier_name here?
+   * Child components (table, cards) just render product.category_name directly.
+   * Doing the lookup once here is cleaner than repeating it in every child.
+   */
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -57,7 +86,7 @@ export const ProductsPage: React.FC = () => {
       const suppliersList = suppliersData.suppliers || suppliersData;
       const productsList = productsData.products || productsData;
 
-      // ✅ FIX: Map category_id and supplier_id to names
+      // Map IDs to names so child components don't need to do any lookups
       const enrichedProducts = productsList.map((product: Product) => ({
         ...product,
         category_name:
@@ -80,12 +109,12 @@ export const ProductsPage: React.FC = () => {
   };
 
   const handleAddProduct = () => {
-    setEditingProduct(null);
+    setEditingProduct(null); // null = new product mode
     setShowModal(true);
   };
 
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
+    setEditingProduct(product); // non-null = edit mode
     setShowModal(true);
   };
 
@@ -96,6 +125,7 @@ export const ProductsPage: React.FC = () => {
 
     try {
       await productsAPI.delete(id);
+      // Remove from local state instead of refetching the whole list
       setProducts(products.filter((p) => p.id !== id));
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete product');
@@ -104,9 +134,10 @@ export const ProductsPage: React.FC = () => {
 
   const handleSaveProduct = async () => {
     setShowModal(false);
-    await fetchData();
+    await fetchData(); // Refresh so new/updated product appears immediately
   };
 
+  // Client-side filter — searches name, SKU, and category name simultaneously
   const filteredProducts = products.filter(
     (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -154,6 +185,7 @@ export const ProductsPage: React.FC = () => {
           <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
         ) : (
           <>
+            {/* Desktop: table view — hidden on mobile */}
             <div className="hidden md:block">
               <ProductsTable
                 products={filteredProducts}
@@ -162,6 +194,7 @@ export const ProductsPage: React.FC = () => {
               />
             </div>
 
+            {/* Mobile: card view — hidden on desktop */}
             <div className="md:hidden">
               <ProductsCards
                 products={filteredProducts}
@@ -186,6 +219,10 @@ export const ProductsPage: React.FC = () => {
   );
 };
 
+// ─────────────────────────────────────────────
+// TABLE (Desktop)
+// ─────────────────────────────────────────────
+
 interface TableProps {
   products: Product[];
   onEdit: (product: Product) => void;
@@ -197,6 +234,12 @@ const ProductsTable: React.FC<TableProps> = ({
   onEdit,
   onDelete,
 }) => {
+  /**
+   * Returns Tailwind color classes based on stock level:
+   * - 0 or below          → red    (out of stock)
+   * - At/below reorder    → yellow (low stock warning)
+   * - Above reorder level → green  (healthy)
+   */
   const getStockColor = (stock: number, reorderLevel: number) => {
     if (stock <= 0) return 'text-red-600 bg-red-50';
     if (stock <= reorderLevel) return 'text-yellow-600 bg-yellow-50';
@@ -253,7 +296,7 @@ const ProductsTable: React.FC<TableProps> = ({
                   {product.category_name || '-'}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900 text-right">
-                  ${Number(product.unit_price).toFixed(2)}
+                  ₱{Number(product.unit_price).toFixed(2)}
                 </td>
                 <td className="px-6 py-4 text-center">
                   <span
@@ -287,11 +330,16 @@ const ProductsTable: React.FC<TableProps> = ({
   );
 };
 
+// ─────────────────────────────────────────────
+// CARDS (Mobile)
+// ─────────────────────────────────────────────
+
 const ProductsCards: React.FC<TableProps> = ({
   products,
   onEdit,
   onDelete,
 }) => {
+  // Same logic as table version but returns solid background for the badge
   const getStockColor = (stock: number, reorderLevel: number) => {
     if (stock <= 0) return 'bg-red-500';
     if (stock <= reorderLevel) return 'bg-yellow-500';
@@ -320,6 +368,7 @@ const ProductsCards: React.FC<TableProps> = ({
               </h3>
               <p className="text-sm text-gray-500">SKU: {product.sku}</p>
             </div>
+            {/* Stock badge — color reflects urgency at a glance */}
             <span
               className={`px-2 py-1 rounded text-xs font-semibold text-white ${getStockColor(product.current_stock || 0, product.reorder_level)}`}
             >
@@ -343,7 +392,7 @@ const ProductsCards: React.FC<TableProps> = ({
             <div>
               <span className="text-gray-500">Price:</span>
               <p className="text-gray-900 font-medium">
-                ${Number(product.unit_price).toFixed(2)}
+                ₱{Number(product.unit_price).toFixed(2)}
               </p>
             </div>
             <div>
@@ -374,6 +423,10 @@ const ProductsCards: React.FC<TableProps> = ({
   );
 };
 
+// ─────────────────────────────────────────────
+// MODAL — Add / Edit product
+// ─────────────────────────────────────────────
+
 interface ModalProps {
   product: Product | null;
   categories: Category[];
@@ -402,6 +455,18 @@ const ProductModal: React.FC<ModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  /**
+   * handleChange — updates formData for any input type.
+   *
+   * Why convert category_id and supplier_id with Number()?
+   * Select inputs always return strings (e.g., "3").
+   * The API expects numbers, so we convert immediately on change.
+   *
+   * Why parseFloat for unit_price / reorder_level instead of Number()?
+   * parseFloat('29.') stays as 29 while the user is still typing the decimal.
+   * This lets the user type "29.50" naturally without the field resetting.
+   * Falls back to '' so the user can fully clear the field if needed.
+   */
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -419,18 +484,29 @@ const ProductModal: React.FC<ModalProps> = ({
     });
   };
 
+  /**
+   * handleSubmit — final conversion from form state to API payload.
+   *
+   * Why convert to numbers again here?
+   * The form allows '' (empty string) so users can clear fields while typing.
+   * At submit time we must send actual numbers to the API.
+   * parseFloat(String(...)) || 0 safely handles any value including ''.
+   *
+   * Why validate unit_price > 0 on the frontend?
+   * Gives instant feedback without a round trip to the server.
+   * The backend validates too, but this is faster for the user.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // ✅ Convert strings to numbers before submitting
+    // Convert form strings → numbers before sending to API
     const submitData = {
       ...formData,
       unit_price: parseFloat(String(formData.unit_price)) || 0,
       reorder_level: parseInt(String(formData.reorder_level)) || 0,
     };
 
-    // Validation
     if (submitData.unit_price <= 0) {
       setError('⚠️ Unit price must be greater than 0');
       return;
@@ -440,9 +516,9 @@ const ProductModal: React.FC<ModalProps> = ({
 
     try {
       if (product) {
-        await productsAPI.update(product.id, submitData); // ✅ submitData not formData
+        await productsAPI.update(product.id, submitData);
       } else {
-        await productsAPI.create(submitData); // ✅ submitData not formData
+        await productsAPI.create(submitData);
       }
       onSave();
     } catch (err: any) {
@@ -491,7 +567,7 @@ const ProductModal: React.FC<ModalProps> = ({
                 value={formData.name}
                 onChange={handleChange}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="e.g., Laptop"
+                placeholder="e.g., Coca-Cola 1.5L"
                 required
               />
             </div>
@@ -560,11 +636,11 @@ const ProductModal: React.FC<ModalProps> = ({
                   name="unit_price"
                   value={formData.unit_price}
                   onChange={handleChange}
-                  onFocus={(e) => e.target.select()}
+                  onFocus={(e) => e.target.select()} // Select all on click — easy to overwrite
                   step="0.01"
                   min="0"
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                  placeholder={'0.00'}
+                  placeholder="0.00"
                   required
                 />
               </div>
@@ -578,7 +654,7 @@ const ProductModal: React.FC<ModalProps> = ({
                   name="reorder_level"
                   value={formData.reorder_level}
                   onChange={handleChange}
-                  onFocus={(e) => e.target.select()}
+                  onFocus={(e) => e.target.select()} // Select all on click — easy to overwrite
                   min="0"
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   placeholder="10"

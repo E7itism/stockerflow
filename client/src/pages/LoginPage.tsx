@@ -1,5 +1,9 @@
 /**
- * Login Page
+ * LoginPage.tsx
+ *
+ * Entry point for unauthenticated users.
+ * On success, calls AuthContext.login() which stores the JWT
+ * and redirects to the dashboard.
  */
 
 import { useState } from 'react';
