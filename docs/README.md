@@ -35,10 +35,10 @@
 ![Inventory](screenshots/inventory.PNG)
 
 ### Supplier (Desktop)
-![Supplier](docs/screenshots/supplier.PNG)
+![Supplier](screenshots/supplier.PNG)
 
 ### Supplier (Mobile)
-![Supplier Mobile](docs/screenshots/supplier-mobile.PNG)
+![Supplier Mobile](screenshots/supplier-mobile.PNG)
 ---
 
 ## ✨ Features
