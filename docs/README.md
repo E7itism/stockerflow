@@ -2,7 +2,7 @@
 
 > A full-stack inventory management system built for small businesses and sari-sari stores in the Philippines.
 
-![STOCKER Dashboard](docs/screenshots/dashboard.PNG)
+![STOCKER Dashboard](screenshots/dashboard.PNG)
 
 ## 🌐 Live Demo
 
@@ -19,20 +19,20 @@
 
 ### Dashboard
 
-![Dashboard](docs/screenshots/dashboard.PNG)
-![Dashboard Mobile](docs/screenshots/dashboard-mobile.PNG)
+![Dashboard](screenshots/dashboard.PNG)
+![Dashboard Mobile](screenshots/dashboard-mobile.PNG)
 
 ### Products (Desktop)
 
-![Products Desktop](docs/screenshots/products.PNG)
+![Products Desktop](screenshots/products.PNG)
 
 ### Products (Mobile)
 
-![Products Mobile](docs/screenshots/products-mobile.PNG)
+![Products Mobile](screenshots/products-mobile.PNG)
 
 ### Inventory Transactions (Desktop)
 
-![Inventory](docs/screenshots/inventory.PNG)
+![Inventory](screenshots/inventory.PNG)
 
 ### Supplier (Desktop)
 ![Supplier](docs/screenshots/supplier.PNG)
