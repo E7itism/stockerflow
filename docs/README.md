@@ -6,7 +6,7 @@
 
 ## 🌐 Live Demo
 
-**→ [View Live App ] https://stockerflow-8fodof5ml-e7itisms-projects.vercel.app/**
+**→ [View Live App ] stockerflow.vercel.app**
 
 | Test Account | Credentials      |
 | ------------ | ---------------- |
