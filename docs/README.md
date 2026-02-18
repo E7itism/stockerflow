@@ -6,7 +6,7 @@
 
 ## 🌐 Live Demo
 
-**→ [View Live App ] stockerflow.vercel.app**
+**→ [View Live App ](https://stockerflow.vercel.app)**
 
 | Test Account | Credentials      |
 | ------------ | ---------------- |
