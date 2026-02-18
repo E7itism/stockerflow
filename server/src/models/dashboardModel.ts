@@ -99,7 +99,7 @@ class DashboardModel {
 
     return {
       total_value: parseFloat(result.rows[0].total_value),
-      currency: 'USD',
+      currency: 'PHP',
     };
   }
 
