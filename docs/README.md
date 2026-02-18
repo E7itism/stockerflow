@@ -26,16 +26,16 @@
 
 ![Products Desktop](screenshots/products.PNG)
 
-### Products (Mobile)
-
-![Products Mobile](screenshots/products-mobile.PNG)
-
 ### Inventory Transactions (Desktop)
 
 ![Inventory](screenshots/inventory.PNG)
 
 ### Supplier (Desktop)
 ![Supplier](screenshots/supplier.PNG)
+
+### Products (Mobile)
+
+![Products Mobile](screenshots/products-mobile.PNG)
 
 ### Supplier (Mobile)
 ![Supplier Mobile](screenshots/supplier-mobile.PNG)
