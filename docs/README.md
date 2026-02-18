@@ -383,7 +383,7 @@ Products with `current_stock <= reorder_level` appear in the dashboard alert car
 
 ## 👨‍💻 Author
 
-**YOUR-NAME-HERE**
+**Eliezer Gaudiel Jr**
 
 - GitHub: ELIEZER GAUDIEL : https://github.com/E7itism
 - LinkedIn: ELIEZER GAUDIEL : www.linkedin.com/in/esgaudiel
