@@ -13,6 +13,7 @@
 | Email        | demo@mail.com |
 | Password     | demo123          |
 
+Or log in with your registered account
 ---
 
 ## 📸 Screenshots
@@ -137,11 +138,11 @@ npm start
 # App opens at http://localhost:3000
 ```
 
-### 4. Login with demo account
+### 4. Log in with your registered account
 
 ```
-Email: demo@stocker.com
-Password: demo123
+Email: [your-username]
+Password: [your-password]
 ```
 
 ---
@@ -334,7 +335,7 @@ inventory_transactions (
 ### Test the deployed app:
 
 1. Visit your Vercel URL
-2. Login with: `demo@stocker.com` / `demo123`
+2. Login with your registered username and password
 3. Test all pages: Dashboard, Products, Categories, Suppliers, Inventory
 4. Try mobile view (F12 → phone icon)
 5. Check browser console for errors (F12)
