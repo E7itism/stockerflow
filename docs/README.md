@@ -8,20 +8,18 @@
 
 **→ [View Live App ](https://stockerflow.vercel.app)**
 
-| Test Account | Credentials      |
-| ------------ | ---------------- |
+| Test Account | Credentials   |
+| ------------ | ------------- |
 | Email        | demo@mail.com |
-| Password     | demo123          |
+| Password     | demo123       |
 
-Or log in with your registered account
----
+## Or log in with your registered account
 
 ## 📸 Screenshots
 
 ### Dashboard
 
 ![Dashboard](screenshots/dashboard.PNG)
-
 
 ### Products (Desktop)
 
@@ -32,9 +30,11 @@ Or log in with your registered account
 ![Inventory](screenshots/inventory.PNG)
 
 ### Supplier (Desktop)
+
 ![Supplier](screenshots/supplier.PNG)
 
 ### Dashboard (Mobile)
+
 ![Dashboard Mobile](screenshots/dashboard-mobile.PNG)
 
 ### Products (Mobile)
@@ -42,8 +42,8 @@ Or log in with your registered account
 ![Products Mobile](screenshots/products-mobile.PNG)
 
 ### Supplier (Mobile)
+
 ![Supplier Mobile](screenshots/supplier-mobile.PNG)
----
 
 ## ✨ Features
 
@@ -149,13 +149,15 @@ Password: [your-password]
 
 ## ⚙️ Environment Variables
 
-### Backend (`server/.env`)
+## ⚙️ Environment Variables
+
+### Backend (`server/.env.example`)
 
 ```bash
 NODE_ENV=development
 PORT=5000
 DATABASE_URL=postgresql://username:password@localhost:5432/stocker
-JWT_SECRET=your-secret-key-here-change-this
+JWT_SECRET=your-secret-key-here
 CORS_ORIGIN=http://localhost:3000
 ```
 
@@ -164,6 +166,14 @@ CORS_ORIGIN=http://localhost:3000
 ```bash
 REACT_APP_API_URL=http://localhost:5000/api
 ```
+
+### 🔐 Environment Setup
+
+This project uses environment variables.
+
+1. Copy `.env.example` to `.env`
+2. Fill in required values
+3. Never commit `.env` to version control
 
 ---
 
