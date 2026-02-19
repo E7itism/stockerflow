@@ -2,15 +2,15 @@
 
 > A full-stack inventory management system built for small businesses and sari-sari stores in the Philippines.
 
-![STOCKER Dashboard](screenshots/dashboard)
+![STOCKER Dashboard](screenshots/dashboard.PNG)
 
 ## 🌐 Live Demo
 
-**→ [View Live App ] https://stockerflow-8fodof5ml-e7itisms-projects.vercel.app/**
+**→ [View Live App ](https://stockerflow.vercel.app)**
 
 | Test Account | Credentials      |
 | ------------ | ---------------- |
-| Email        | demo@stocker.com |
+| Email        | demo@mail.com |
 | Password     | demo123          |
 
 ---
@@ -19,20 +19,29 @@
 
 ### Dashboard
 
-![Dashboard](screenshots/dashboard)
+![Dashboard](screenshots/dashboard.PNG)
+
 
 ### Products (Desktop)
 
-![Products Desktop](screenshots/products)
+![Products Desktop](screenshots/products.PNG)
+
+### Inventory Transactions (Desktop)
+
+![Inventory](screenshots/inventory.PNG)
+
+### Supplier (Desktop)
+![Supplier](screenshots/supplier.PNG)
+
+### Dashboard (Mobile)
+![Dashboard Mobile](screenshots/dashboard-mobile.PNG)
 
 ### Products (Mobile)
 
-![Products Mobile](screenshots/products-mobile)
+![Products Mobile](screenshots/products-mobile.PNG)
 
-### Inventory Transactions
-
-![Inventory](screenshots/inventory)
-
+### Supplier (Mobile)
+![Supplier Mobile](screenshots/supplier-mobile.PNG)
 ---
 
 ## ✨ Features
@@ -374,7 +383,7 @@ Products with `current_stock <= reorder_level` appear in the dashboard alert car
 
 ## 👨‍💻 Author
 
-**YOUR-NAME-HERE**
+**Eliezer Gaudiel Jr**
 
 - GitHub: ELIEZER GAUDIEL : https://github.com/E7itism
 - LinkedIn: ELIEZER GAUDIEL : www.linkedin.com/in/esgaudiel
