@@ -17,6 +17,7 @@ import categoryRoutes from './routes/categoryRoutes';
 import supplierRoutes from './routes/supplierRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import inventoryRoutes from './routes/inventoryRoutes';
+import posRoutes from './routes/posRoutes';
 
 dotenv.config(); // Load .env variables into process.env
 
@@ -83,6 +84,7 @@ app.use('/api/categories', categoryRoutes); // CRUD /api/categories
 app.use('/api/suppliers', supplierRoutes); // CRUD /api/suppliers
 app.use('/api/dashboard', dashboardRoutes); // GET  /api/dashboard/stats
 app.use('/api/inventory', inventoryRoutes); // CRUD /api/inventory/transactions
+app.use('/api/pos', posRoutes); // GET /api/pos/products, POST /api/pos/sales
 
 /**
  * Root route — API documentation/discovery.
