@@ -19,6 +19,7 @@ import type { Product } from '../types';
 import toast from 'react-hot-toast';
 import ReceiptModal from '../components/receipt/ReceiptModal.tsx';
 import CheckoutModal from '../components/cart/Checkoutmodal.tsx';
+import { Link } from 'react-router-dom';
 
 export default function POSPage() {
   // ── Product state ────────────────────────────────────────────
@@ -107,6 +108,12 @@ export default function POSPage() {
           <span className="text-green-100 text-sm">
             {user?.first_name} {user?.last_name}
           </span>
+          <Link
+            to="/history"
+            className="bg-green-700 hover:bg-green-800 text-white text-sm px-3 py-1.5 rounded-lg transition-colors"
+          >
+            Sales History
+          </Link>
           <button
             onClick={logout}
             className="bg-green-700 hover:bg-green-800 text-white text-sm px-3 py-1.5 rounded-lg transition-colors"
