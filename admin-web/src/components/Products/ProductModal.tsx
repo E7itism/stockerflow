@@ -1,22 +1,20 @@
 /**
- * Product Modal - FIXED VERSION
+ * ProductModal.tsx
  *
- * FIXES:
- * - Validates category_id and supplier_id before submit
- * - Shows error if either is not selected
- * - Keeps existing values when editing
- * - Prevents foreign key violations
+ * Reusable modal for creating and editing products.
+ * Used by ProductsPage for both Add and Edit flows.
+ *
+ * Props:
+ *   product    — null = create mode, Product = edit mode
+ *   categories — list for the category dropdown
+ *   suppliers  — list for the supplier dropdown
+ *   onClose    — called when modal is dismissed
+ *   onSave     — called after successful save (triggers list refresh)
  */
 
-import React, { useState, useEffect } from 'react';
-import { Product } from '../../pages/ProductsPage';
-import { productsAPI, categoriesAPI, suppliersAPI } from '../../services/api';
-
-interface Props {
-  product: Product | null;
-  onClose: () => void;
-  onSave: () => void;
-}
+import { useState } from 'react';
+import { productsAPI } from '../../services/api';
+import type { Product } from '../../pages/ProductsPage';
 
 interface Category {
   id: number;
@@ -28,7 +26,21 @@ interface Supplier {
   name: string;
 }
 
-export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
+interface Props {
+  product: Product | null;
+  categories: Category[];
+  suppliers: Supplier[];
+  onClose: () => void;
+  onSave: () => void;
+}
+
+export const ProductModal: React.FC<Props> = ({
+  product,
+  categories,
+  suppliers,
+  onClose,
+  onSave,
+}) => {
   const [formData, setFormData] = useState({
     sku: product?.sku || '',
     name: product?.name || '',
@@ -37,38 +49,11 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
     supplier_id: product?.supplier_id || 0,
     unit_price: product?.unit_price || 0,
     reorder_level: product?.reorder_level || 10,
+    unit_of_measure: product?.unit_of_measure || 'piece',
   });
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetchDropdownData();
-  }, []);
-
-  const fetchDropdownData = async () => {
-    try {
-      const [categoriesData, suppliersData] = await Promise.all([
-        categoriesAPI.getAll(),
-        suppliersAPI.getAll(),
-      ]);
-
-      setCategories(
-        Array.isArray(categoriesData)
-          ? categoriesData
-          : categoriesData.categories || [],
-      );
-      setSuppliers(
-        Array.isArray(suppliersData)
-          ? suppliersData
-          : suppliersData.suppliers || [],
-      );
-    } catch (err) {
-      console.error('Failed to load dropdown data:', err);
-    }
-  };
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -79,12 +64,11 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
     setFormData({
       ...formData,
       [name]:
-        name === 'unit_price' ||
-        name === 'reorder_level' ||
-        name === 'category_id' ||
-        name === 'supplier_id'
+        name === 'category_id' || name === 'supplier_id'
           ? Number(value)
-          : value,
+          : name === 'unit_price' || name === 'reorder_level'
+            ? parseFloat(value) || ''
+            : value,
     });
   };
 
@@ -92,7 +76,6 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
     e.preventDefault();
     setError('');
 
-    // ✅ VALIDATION: Check if category and supplier are selected
     if (formData.category_id === 0) {
       setError('Please select a category');
       return;
@@ -103,19 +86,13 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
       return;
     }
 
-    // ✅ VALIDATION: Check if SKU and name are filled
-    if (!formData.sku.trim()) {
-      setError('SKU is required');
-      return;
-    }
+    const submitData = {
+      ...formData,
+      unit_price: parseFloat(String(formData.unit_price)) || 0,
+      reorder_level: parseInt(String(formData.reorder_level)) || 0,
+    };
 
-    if (!formData.name.trim()) {
-      setError('Product name is required');
-      return;
-    }
-
-    // ✅ VALIDATION: Check if price is positive
-    if (formData.unit_price <= 0) {
+    if (submitData.unit_price <= 0) {
       setError('Unit price must be greater than 0');
       return;
     }
@@ -123,78 +100,61 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
     setLoading(true);
 
     try {
-      console.log('Submitting product data:', formData);
-
       if (product) {
-        // Editing existing product
-        await productsAPI.update(product.id, formData);
+        await productsAPI.update(product.id, submitData);
       } else {
-        // Creating new product
-        await productsAPI.create(formData);
+        await productsAPI.create(submitData);
       }
-
       onSave();
     } catch (err: any) {
-      console.error('Save product error:', err);
-
-      // Better error messages
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else if (err.response?.status === 500) {
-        setError('Server error. Please check if category and supplier exist.');
-      } else {
-        setError('Failed to save product. Please try again.');
-      }
-
+      setError(err.response?.data?.error || 'Failed to save product');
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+      <div className="bg-white rounded-t-lg sm:rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
             {product ? 'Edit Product' : 'Add New Product'}
           </h2>
 
           {error && (
             <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
-              ⚠️ {error}
+              {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  SKU *
-                </label>
-                <input
-                  type="text"
-                  name="sku"
-                  value={formData.sku}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="PROD-001"
-                  required
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                SKU *
+              </label>
+              <input
+                type="text"
+                name="sku"
+                value={formData.sku}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                placeholder="e.g., PROD-001"
+                required
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Product Name *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Laptop"
-                  required
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product Name *
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                placeholder="e.g., Coca-Cola 1.5L"
+                required
+              />
             </div>
 
             <div>
@@ -206,85 +166,66 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Product description..."
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                placeholder="Optional description..."
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Category *
-                </label>
-                <select
-                  name="category_id"
-                  value={formData.category_id}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    formData.category_id === 0
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300'
-                  }`}
-                  required
-                >
-                  <option value={0}>Select category...</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
-                {formData.category_id === 0 && (
-                  <p className="text-xs text-red-600 mt-1">
-                    ⚠️ Category is required
-                  </p>
-                )}
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Category *
+              </label>
+              <select
+                name="category_id"
+                value={formData.category_id}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                required
+              >
+                <option value={0}>Select category...</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Supplier *
-                </label>
-                <select
-                  name="supplier_id"
-                  value={formData.supplier_id}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    formData.supplier_id === 0
-                      ? 'border-red-300 bg-red-50'
-                      : 'border-gray-300'
-                  }`}
-                  required
-                >
-                  <option value={0}>Select supplier...</option>
-                  {suppliers.map((sup) => (
-                    <option key={sup.id} value={sup.id}>
-                      {sup.name}
-                    </option>
-                  ))}
-                </select>
-                {formData.supplier_id === 0 && (
-                  <p className="text-xs text-red-600 mt-1">
-                    ⚠️ Supplier is required
-                  </p>
-                )}
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Supplier *
+              </label>
+              <select
+                name="supplier_id"
+                value={formData.supplier_id}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                required
+              >
+                <option value={0}>Select supplier...</option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit Price ($) *
+                  Unit Price *
                 </label>
                 <input
                   type="number"
                   name="unit_price"
                   value={formData.unit_price}
                   onChange={handleChange}
+                  onFocus={(e) => e.target.select()}
                   step="0.01"
-                  min="0.01"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="99.99"
+                  min="0"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                  placeholder="0.00"
                   required
                 />
               </div>
@@ -298,37 +239,52 @@ export const ProductModal: React.FC<Props> = ({ product, onClose, onSave }) => {
                   name="reorder_level"
                   value={formData.reorder_level}
                   onChange={handleChange}
+                  onFocus={(e) => e.target.select()}
                   min="0"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
                   placeholder="10"
                   required
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Unit of Measure *
+              </label>
+              <select
+                name="unit_of_measure"
+                value={formData.unit_of_measure}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+              >
+                <option value="piece">Piece</option>
+                <option value="sachet">Sachet</option>
+                <option value="pack">Pack</option>
+                <option value="bottle">Bottle</option>
+                <option value="can">Can</option>
+                <option value="kilo">Kilo</option>
+                <option value="gram">Gram</option>
+                <option value="tray">Tray</option>
+                <option value="dozen">Dozen</option>
+                <option value="liter">Liter</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t">
               <button
                 type="button"
                 onClick={onClose}
-                disabled={loading}
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={
-                  loading ||
-                  formData.category_id === 0 ||
-                  formData.supplier_id === 0
-                }
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 font-medium"
+                disabled={loading}
+                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 font-medium"
               >
-                {loading
-                  ? 'Saving...'
-                  : product
-                    ? 'Update Product'
-                    : 'Add Product'}
+                {loading ? 'Saving...' : product ? 'Update' : 'Add Product'}
               </button>
             </div>
           </form>

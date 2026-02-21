@@ -92,6 +92,7 @@ export interface ProductInput {
   supplier_id: number;
   unit_price: number;
   reorder_level: number;
+  unit_of_measure?: string;
 }
 
 export const productsAPI = {

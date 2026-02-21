@@ -6,12 +6,13 @@
  * can show names instead of raw IDs.
  *
  * Desktop: table view | Mobile: card view
- * Modal: shared for both Add and Edit
+ * Modal: extracted to components/Products/ProductModal.tsx
  */
 
 import { useEffect, useState } from 'react';
 import { productsAPI, categoriesAPI, suppliersAPI } from '../services/api';
 import { Layout } from '../components/Layout';
+import { ProductModal } from '../components/Products/ProductModal';
 
 export interface Product {
   id: number;
@@ -23,6 +24,7 @@ export interface Product {
   supplier_id: number;
   supplier_name?: string;
   unit_price: number;
+  unit_of_measure: string;
   reorder_level: number;
   current_stock?: number;
   created_at?: string;
@@ -54,22 +56,16 @@ export const ProductsPage: React.FC = () => {
   }, []);
 
   /**
-   * Fetches products, categories, and suppliers in parallel.
+   * fetchData — loads products, categories, and suppliers in parallel.
    *
-   * Why fetch all 3 together?
-   * Products only store category_id and supplier_id (foreign keys).
-   * To show "Beverages" instead of "3", we need the categories list.
-   * Promise.all runs all 3 requests simultaneously — faster than sequential awaits.
+   * Why Promise.all?
+   * Runs all 3 requests simultaneously instead of one after another.
+   * Faster for the user — total wait time = slowest request, not sum of all.
    *
-   * Why || fallback on each response?
-   * Different API responses may wrap data differently:
-   *   categoriesData.categories  → if backend returns { categories: [...] }
-   *   categoriesData             → if backend returns the array directly
-   * The fallback handles both shapes safely.
-   *
-   * Why enrich products with category_name and supplier_name here?
-   * Child components (table, cards) just render product.category_name directly.
-   * Doing the lookup once here is cleaner than repeating it in every child.
+   * Why enrich products with category_name and supplier_name?
+   * Products store foreign key IDs, not names. We do the lookup once here
+   * so child components (table, cards) can just render product.category_name
+   * without needing their own lookup logic.
    */
   const fetchData = async () => {
     try {
@@ -86,7 +82,6 @@ export const ProductsPage: React.FC = () => {
       const suppliersList = suppliersData.suppliers || suppliersData;
       const productsList = productsData.products || productsData;
 
-      // Map IDs to names so child components don't need to do any lookups
       const enrichedProducts = productsList.map((product: Product) => ({
         ...product,
         category_name:
@@ -109,7 +104,7 @@ export const ProductsPage: React.FC = () => {
   };
 
   const handleAddProduct = () => {
-    setEditingProduct(null); // null = new product mode
+    setEditingProduct(null); // null = create mode
     setShowModal(true);
   };
 
@@ -119,13 +114,10 @@ export const ProductsPage: React.FC = () => {
   };
 
   const handleDeleteProduct = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) {
+    if (!window.confirm('Are you sure you want to delete this product?'))
       return;
-    }
-
     try {
       await productsAPI.delete(id);
-      // Remove from local state instead of refetching the whole list
       setProducts(products.filter((p) => p.id !== id));
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to delete product');
@@ -134,10 +126,10 @@ export const ProductsPage: React.FC = () => {
 
   const handleSaveProduct = async () => {
     setShowModal(false);
-    await fetchData(); // Refresh so new/updated product appears immediately
+    await fetchData();
   };
 
-  // Client-side filter — searches name, SKU, and category name simultaneously
+  // Client-side filter — searches name, SKU, and category simultaneously
   const filteredProducts = products.filter(
     (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -170,7 +162,7 @@ export const ProductsPage: React.FC = () => {
             </div>
             <button
               onClick={handleAddProduct}
-              className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:bg-blue-700 transition-colors font-medium text-base"
+              className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-base"
             >
               + Add Product
             </button>
@@ -185,7 +177,7 @@ export const ProductsPage: React.FC = () => {
           <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
         ) : (
           <>
-            {/* Desktop: table view — hidden on mobile */}
+            {/* Desktop: table view */}
             <div className="hidden md:block">
               <ProductsTable
                 products={filteredProducts}
@@ -194,7 +186,7 @@ export const ProductsPage: React.FC = () => {
               />
             </div>
 
-            {/* Mobile: card view — hidden on desktop */}
+            {/* Mobile: card view */}
             <div className="md:hidden">
               <ProductsCards
                 products={filteredProducts}
@@ -234,12 +226,6 @@ const ProductsTable: React.FC<TableProps> = ({
   onEdit,
   onDelete,
 }) => {
-  /**
-   * Returns Tailwind color classes based on stock level:
-   * - 0 or below          → red    (out of stock)
-   * - At/below reorder    → yellow (low stock warning)
-   * - Above reorder level → green  (healthy)
-   */
   const getStockColor = (stock: number, reorderLevel: number) => {
     if (stock <= 0) return 'text-red-600 bg-red-50';
     if (stock <= reorderLevel) return 'text-yellow-600 bg-yellow-50';
@@ -272,6 +258,9 @@ const ProductsTable: React.FC<TableProps> = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                 Category
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Unit
+              </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                 Price
               </th>
@@ -294,6 +283,9 @@ const ProductsTable: React.FC<TableProps> = ({
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-600">
                   {product.category_name || '-'}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-600">
+                  {product.unit_of_measure}
                 </td>
                 <td className="px-6 py-4 text-sm text-gray-900 text-right">
                   ₱{Number(product.unit_price).toFixed(2)}
@@ -339,7 +331,6 @@ const ProductsCards: React.FC<TableProps> = ({
   onEdit,
   onDelete,
 }) => {
-  // Same logic as table version but returns solid background for the badge
   const getStockColor = (stock: number, reorderLevel: number) => {
     if (stock <= 0) return 'bg-red-500';
     if (stock <= reorderLevel) return 'bg-yellow-500';
@@ -368,7 +359,6 @@ const ProductsCards: React.FC<TableProps> = ({
               </h3>
               <p className="text-sm text-gray-500">SKU: {product.sku}</p>
             </div>
-            {/* Stock badge — color reflects urgency at a glance */}
             <span
               className={`px-2 py-1 rounded text-xs font-semibold text-white ${getStockColor(product.current_stock || 0, product.reorder_level)}`}
             >
@@ -396,9 +386,9 @@ const ProductsCards: React.FC<TableProps> = ({
               </p>
             </div>
             <div>
-              <span className="text-gray-500">Reorder:</span>
+              <span className="text-gray-500">Unit:</span>
               <p className="text-gray-900 font-medium">
-                {product.reorder_level}
+                {product.unit_of_measure}
               </p>
             </div>
           </div>
@@ -406,282 +396,19 @@ const ProductsCards: React.FC<TableProps> = ({
           <div className="flex gap-2">
             <button
               onClick={() => onEdit(product)}
-              className="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:bg-blue-700 font-medium text-sm"
+              className="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium text-sm"
             >
               Edit
             </button>
             <button
               onClick={() => onDelete(product.id)}
-              className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 active:bg-red-700 font-medium text-sm"
+              className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium text-sm"
             >
               Delete
             </button>
           </div>
         </div>
       ))}
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────
-// MODAL — Add / Edit product
-// ─────────────────────────────────────────────
-
-interface ModalProps {
-  product: Product | null;
-  categories: Category[];
-  suppliers: Supplier[];
-  onClose: () => void;
-  onSave: () => void;
-}
-
-const ProductModal: React.FC<ModalProps> = ({
-  product,
-  categories,
-  suppliers,
-  onClose,
-  onSave,
-}) => {
-  const [formData, setFormData] = useState({
-    sku: product?.sku || '',
-    name: product?.name || '',
-    description: product?.description || '',
-    category_id: product?.category_id || 0,
-    supplier_id: product?.supplier_id || 0,
-    unit_price: product?.unit_price || 0,
-    reorder_level: product?.reorder_level || 10,
-  });
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  /**
-   * handleChange — updates formData for any input type.
-   *
-   * Why convert category_id and supplier_id with Number()?
-   * Select inputs always return strings (e.g., "3").
-   * The API expects numbers, so we convert immediately on change.
-   *
-   * Why parseFloat for unit_price / reorder_level instead of Number()?
-   * parseFloat('29.') stays as 29 while the user is still typing the decimal.
-   * This lets the user type "29.50" naturally without the field resetting.
-   * Falls back to '' so the user can fully clear the field if needed.
-   */
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >,
-  ) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]:
-        name === 'category_id' || name === 'supplier_id'
-          ? Number(value)
-          : name === 'unit_price' || name === 'reorder_level'
-            ? parseFloat(value) || ''
-            : value,
-    });
-  };
-
-  /**
-   * handleSubmit — final conversion from form state to API payload.
-   *
-   * Why convert to numbers again here?
-   * The form allows '' (empty string) so users can clear fields while typing.
-   * At submit time we must send actual numbers to the API.
-   * parseFloat(String(...)) || 0 safely handles any value including ''.
-   *
-   * Why validate unit_price > 0 on the frontend?
-   * Gives instant feedback without a round trip to the server.
-   * The backend validates too, but this is faster for the user.
-   */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    // Convert form strings → numbers before sending to API
-    const submitData = {
-      ...formData,
-      unit_price: parseFloat(String(formData.unit_price)) || 0,
-      reorder_level: parseInt(String(formData.reorder_level)) || 0,
-    };
-
-    if (submitData.unit_price <= 0) {
-      setError('⚠️ Unit price must be greater than 0');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      if (product) {
-        await productsAPI.update(product.id, submitData);
-      } else {
-        await productsAPI.create(submitData);
-      }
-      onSave();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to save product');
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-lg sm:rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-4 sm:p-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
-            {product ? 'Edit Product' : 'Add New Product'}
-          </h2>
-
-          {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                SKU *
-              </label>
-              <input
-                type="text"
-                name="sku"
-                value={formData.sku}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="e.g., PROD-001"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Name *
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="e.g., Coca-Cola 1.5L"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={3}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="Optional description..."
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category *
-              </label>
-              <select
-                name="category_id"
-                value={formData.category_id}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                required
-              >
-                <option value={0}>Select category...</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Supplier *
-              </label>
-              <select
-                name="supplier_id"
-                value={formData.supplier_id}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                required
-              >
-                <option value={0}>Select supplier...</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit Price *
-                </label>
-                <input
-                  type="number"
-                  name="unit_price"
-                  value={formData.unit_price}
-                  onChange={handleChange}
-                  onFocus={(e) => e.target.select()} // Select all on click — easy to overwrite
-                  step="0.01"
-                  min="0"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reorder Level *
-                </label>
-                <input
-                  type="number"
-                  name="reorder_level"
-                  value={formData.reorder_level}
-                  onChange={handleChange}
-                  onFocus={(e) => e.target.select()} // Select all on click — easy to overwrite
-                  min="0"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                  placeholder="10"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 active:bg-blue-700 disabled:bg-blue-300 font-medium"
-              >
-                {loading ? 'Saving...' : product ? 'Update' : 'Add Product'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
     </div>
   );
 };
