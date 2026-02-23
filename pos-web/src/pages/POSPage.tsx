@@ -63,9 +63,9 @@ export default function POSPage() {
     setFilteredProducts(
       products.filter(
         (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q) ||
-          p.category_name.toLowerCase().includes(q),
+          p.name?.toLowerCase().includes(q) ||
+          p.sku?.toLowerCase().includes(q) ||
+          p.category_name?.toLowerCase().includes(q),
       ),
     );
   }, [search, products]);

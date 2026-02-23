@@ -18,6 +18,7 @@ interface Product {
   reorder_level: number;
   created_at: Date;
   updated_at: Date;
+  unit_of_measure?: string;
 }
 
 interface CreateProductInput {
@@ -28,6 +29,7 @@ interface CreateProductInput {
   supplier_id?: number;
   unit_price: number;
   reorder_level?: number;
+  unit_of_measure?: string;
 }
 
 interface UpdateProductInput {
@@ -38,6 +40,7 @@ interface UpdateProductInput {
   supplier_id?: number;
   unit_price?: number;
   reorder_level?: number;
+  unit_of_measure?: string;
 }
 
 class ProductModel {
@@ -50,11 +53,12 @@ class ProductModel {
       supplier_id,
       unit_price,
       reorder_level = 10,
+      unit_of_measure = 'piece',
     } = productData;
 
     const query = `
-      INSERT INTO products (sku, name, description, category_id, supplier_id, unit_price, reorder_level)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO products (sku, name, description, category_id, supplier_id, unit_price, reorder_level, unit_of_measure)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
 
@@ -66,6 +70,7 @@ class ProductModel {
       supplier_id || null,
       unit_price,
       reorder_level,
+      unit_of_measure,
     ];
     const result = await pool.query(query, values);
     return result.rows[0];
@@ -165,6 +170,10 @@ class ProductModel {
     if (productData.reorder_level !== undefined) {
       fields.push(`reorder_level = $${paramCount++}`);
       values.push(productData.reorder_level);
+    }
+    if (productData.unit_of_measure !== undefined) {
+      fields.push(`unit_of_measure = $${paramCount++}`);
+      values.push(productData.unit_of_measure);
     }
 
     // Always update updated_at to track when the record was last modified

@@ -13,6 +13,7 @@ class ProductController {
         supplier_id,
         unit_price,
         reorder_level,
+        unit_of_measure,
       } = req.body;
 
       // Validate required fields
@@ -45,6 +46,7 @@ class ProductController {
         supplier_id,
         unit_price,
         reorder_level,
+        unit_of_measure,
       });
 
       res.status(201).json({
