@@ -1,179 +1,209 @@
-# 🏪 STOCKER - Inventory Management System
+# 🏪 STOCKER + POS System
 
-> A full-stack inventory management system built for small businesses and sari-sari stores in the Philippines.
+> A full-stack inventory management and point-of-sale system built for small businesses and sari-sari stores in the Philippines.
+
+Built as a **monorepo** — two apps, one backend, one database. Changes in STOCKER reflect instantly in the POS and vice versa.
 
 ![STOCKER Dashboard](screenshots/dashboard.PNG)
 
+---
+
 ## 🌐 Live Demo
 
-**→ [View Live App ](https://stockerflow.vercel.app)**
+| App | URL |
+|---|---|
+| STOCKER (Admin) | [stockerflow.vercel.app](https://stockerflow.vercel.app) |
+| POS (Cashier) | _Coming soon_ |
 
-| Test Account | Credentials   |
-| ------------ | ------------- |
-| Email        | demo@mail.com |
-| Password     | demo123       |
+| Test Account | Credentials |
+|---|---|
+| Email | demo@mail.com |
+| Password | demo123 |
 
-## Or log in with your registered account
+---
 
 ## 📸 Screenshots
 
 ### Dashboard
-
 ![Dashboard](screenshots/dashboard.PNG)
 
 ### Products (Desktop)
-
 ![Products Desktop](screenshots/products.PNG)
 
-### Inventory Transactions (Desktop)
-
+### Inventory Transactions
 ![Inventory](screenshots/inventory.PNG)
 
-### Supplier (Desktop)
-
-![Supplier](screenshots/supplier.PNG)
-
 ### Dashboard (Mobile)
-
 ![Dashboard Mobile](screenshots/dashboard-mobile.PNG)
 
 ### Products (Mobile)
-
 ![Products Mobile](screenshots/products-mobile.PNG)
 
-### Supplier (Mobile)
-
-![Supplier Mobile](screenshots/supplier-mobile.PNG)
+---
 
 ## ✨ Features
 
-- 📊 **Real-time Dashboard** — Overview cards, inventory value, low stock alerts
-- 📦 **Product Management** — Full CRUD with search and filters
-- 📁 **Categories & Suppliers** — Organize your inventory
-- 📈 **Inventory Tracking** — Stock in, stock out, adjustments
-- ⚠️ **Low Stock Alerts** — Get notified when stock is running low
-- 🔐 **Authentication** — JWT-based login and registration
-- 📱 **Mobile Responsive** — Works on any device
-- 🇵🇭 **Philippine-ready** — Built with sari-sari stores in mind
+### STOCKER (Admin Dashboard)
+- 📊 **Real-time Dashboard** — inventory value, low stock alerts, recent transactions
+- 📦 **Product Management** — full CRUD with unit of measure support
+- 📁 **Categories & Suppliers** — organize your inventory
+- 📈 **Inventory Tracking** — stock in, stock out, adjustments with full audit trail
+- ⚠️ **Low Stock Alerts** — notified when stock hits reorder level
+- 📱 **Mobile Responsive** — desktop table view + mobile card view
+
+### POS (Cashier Screen)
+- 🛍️ **Product Browser** — searchable product grid with live stock levels
+- 🛒 **Cart** — add items, adjust quantities, remove items
+- 💵 **Checkout** — cash tendered + automatic change calculation
+- 🧾 **Receipt** — shown after every sale
+- 📋 **Sales History** — today's sales with total revenue summary
+- 📱 **Mobile-First** — tab layout on phone, split panel on tablet/desktop
+- 👴 **Accessible** — large touch targets, clear labels, designed for non-tech-savvy users
+
+### System-Wide
+- 🔄 **Automatic Sync** — POS sales instantly deduct from STOCKER inventory
+- 🔐 **JWT Authentication** — separate sessions for admin and cashier
+- 🇵🇭 **Philippine-ready** — VAT (12%), peso formatting, local units of measure
+
+---
+
+## 🏗️ System Design
+
+```
+┌─────────────────┐     ┌─────────────────┐
+│   STOCKER       │     │   POS           │
+│   (Admin)       │     │   (Cashier)     │
+│   admin-web/    │     │   pos-web/      │
+└────────┬────────┘     └────────┬────────┘
+         │                       │
+         └──────────┬────────────┘
+                    │
+         ┌──────────▼────────────┐
+         │   Express Backend     │
+         │   server/             │
+         └──────────┬────────────┘
+                    │
+         ┌──────────▼────────────┐
+         │   PostgreSQL          │
+         │   One shared database │
+         └───────────────────────┘
+```
+
+**Why monorepo?** Both apps share one backend and one database. When a cashier processes a sale, the POS writes an `inventory_transaction` row — the same table STOCKER reads to calculate stock. No syncing layer needed.
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend
-
-| Tech         | Purpose      |
-| ------------ | ------------ |
-| React 18     | UI Framework |
-| TypeScript   | Type Safety  |
-| Tailwind CSS | Styling      |
-| React Router | Navigation   |
-| Axios        | API Calls    |
-| Recharts     | Charts       |
+### Frontend (Both Apps)
+| Tech | Purpose |
+|---|---|
+| React 18 | UI Framework |
+| TypeScript | Type Safety |
+| Tailwind CSS | Styling |
+| React Router | Navigation |
+| Axios | API Calls |
+| Vite | Build Tool |
 
 ### Backend
-
-| Tech       | Purpose          |
-| ---------- | ---------------- |
-| Node.js    | Runtime          |
-| Express.js | Web Framework    |
-| PostgreSQL | Database         |
-| JWT        | Authentication   |
-| bcrypt     | Password Hashing |
+| Tech | Purpose |
+|---|---|
+| Node.js | Runtime |
+| Express.js | Web Framework |
+| PostgreSQL | Database |
+| JWT | Authentication |
+| bcrypt | Password Hashing |
 
 ### Deployment
-
-| Service | Purpose            |
-| ------- | ------------------ |
-| Vercel  | Frontend Hosting   |
+| Service | Purpose |
+|---|---|
+| Vercel | Frontend Hosting |
 | Railway | Backend + Database |
 
 ---
 
-## 🏃 Quick Start
+## 🗄️ Database Schema
 
-### Prerequisites
+```sql
+users (id, email, password_hash, first_name, last_name, role, created_at)
 
-- Node.js 16+
-- PostgreSQL 14+
-- npm
+categories (id, name, description, created_at)
 
-### 1. Clone the repo
+suppliers (id, name, contact_person, email, phone, address, created_at)
 
-```bash
-git clone https://github.com/E7itism/stockerflow.git
-cd stocker
+products (
+  id, sku, name, description,
+  category_id → categories,
+  supplier_id → suppliers,
+  unit_price, unit_of_measure,
+  reorder_level, created_at, updated_at
+)
+
+inventory_transactions (
+  id, product_id → products,
+  transaction_type ['in'|'out'|'adjustment'],
+  quantity, user_id → users, notes, created_at
+)
+
+-- THE BRIDGE: POS writes 'out' rows, STOCKER writes 'in' rows.
+-- Both apps read the same table. Stock = SUM of all transactions.
+
+sales (
+  id, cashier_id → users,
+  total_amount, cash_tendered, change_amount,
+  payment_method, created_at
+)
+
+sale_items (
+  id, sale_id → sales, product_id → products,
+  product_name,     -- snapshot: frozen at time of sale
+  unit_of_measure,  -- snapshot: won't change if product is edited later
+  unit_price,       -- snapshot: receipt always shows what customer paid
+  quantity, subtotal
+)
 ```
 
-### 2. Setup Backend
-
-```bash
-cd server
-npm install
-
-# Copy environment file
-cp .env.example .env
-# Fill in your DATABASE_URL and JWT_SECRET in .env
-
-# Run database migrations
-npm run migrate
-
-# Start server
-npm start
-# Server runs on http://localhost:5000
-```
-
-### 3. Setup Frontend
-
-```bash
-cd client
-npm install
-
-# Copy environment file
-cp .env.example .env
-# Add REACT_APP_API_URL=http://localhost:5000/api
-
-# Start app
-npm start
-# App opens at http://localhost:3000
-```
-
-### 4. Log in with your registered account
-
-```
-Email: [your-username]
-Password: [your-password]
-```
+**Key decisions:**
+- **Stock is calculated, not stored** — `current_stock = SUM(transactions)`. Complete audit trail, always accurate.
+- **Snapshots in sale_items** — product name/price can change later. Receipts show what the customer actually paid.
+- **Atomic transactions** — sale + sale_items + inventory_transactions saved together. If anything fails, nothing saves.
 
 ---
 
-## ⚙️ Environment Variables
+## 🔌 API Reference
 
-## ⚙️ Environment Variables
-
-### Backend (`server/.env.example`)
-
-```bash
-NODE_ENV=development
-PORT=5000
-DATABASE_URL=postgresql://username:password@localhost:5432/stocker
-JWT_SECRET=your-secret-key-here
-CORS_ORIGIN=http://localhost:3000
+### Authentication
+```
+POST  /api/auth/login        Login (returns JWT)
+POST  /api/auth/register     Register new user
+GET   /api/auth/me           Get current user
 ```
 
-### Frontend (`client/.env`)
-
-```bash
-REACT_APP_API_URL=http://localhost:5000/api
+### Products
+```
+GET    /api/products          All products with stock levels
+GET    /api/products/:id      Single product
+POST   /api/products          Create product
+PUT    /api/products/:id      Update product
+DELETE /api/products/:id      Delete product
 ```
 
-### 🔐 Environment Setup
+### Inventory
+```
+GET   /api/inventory/transactions        All transactions
+POST  /api/inventory/transactions        Create transaction
+GET   /api/inventory/transactions/recent Recent activity
+GET   /api/inventory/stock/low           Low stock products
+```
 
-This project uses environment variables.
-
-1. Copy `.env.example` to `.env`
-2. Fill in required values
-3. Never commit `.env` to version control
+### POS
+```
+GET   /api/pos/products        Products with live stock (for cashier)
+GET   /api/pos/products/:id    Single product
+POST  /api/pos/sales           Create sale (atomic)
+GET   /api/pos/sales           Sales list (filterable by date)
+GET   /api/pos/sales/:id       Single sale with line items
+```
 
 ---
 
@@ -181,251 +211,170 @@ This project uses environment variables.
 
 ```
 stocker/
-├── client/                   # React Frontend
-│   ├── src/
-│   │   ├── components/       # Reusable UI components
-│   │   │   ├── Dashboard/    # Dashboard widgets
-│   │   │   ├── Layout.tsx    # Main layout wrapper
-│   │   │   ├── Navbar.tsx    # Top navigation
-│   │   │   └── Sidebar.tsx   # Side navigation
-│   │   ├── pages/            # Page components
-│   │   │   ├── DashboardPage.tsx
-│   │   │   ├── ProductsPage.tsx
-│   │   │   ├── CategoriesPage.tsx
-│   │   │   ├── SuppliersPage.tsx
-│   │   │   ├── InventoryPage.tsx
-│   │   │   └── LoginPage.tsx
-│   │   ├── services/
-│   │   │   └── api.ts        # All API calls
-│   │   ├── context/
-│   │   │   └── AuthContext.tsx
-│   │   └── types/
-│   │       └── dashboard.ts
-│   └── package.json
+├── admin-web/          # STOCKER — React admin dashboard
+│   └── src/
+│       ├── components/
+│       │   ├── Products/
+│       │   │   └── ProductModal.tsx
+│       │   ├── Dashboard/
+│       │   ├── Layout.tsx
+│       │   └── Navbar.tsx
+│       ├── pages/
+│       │   ├── DashboardPage.tsx
+│       │   ├── ProductsPage.tsx
+│       │   ├── CategoriesPage.tsx
+│       │   ├── SuppliersPage.tsx
+│       │   └── InventoryPage.tsx
+│       ├── context/AuthContext.tsx
+│       └── services/api.ts
 │
-└── server/                   # Node.js Backend
-    ├── src/
-    │   ├── controllers/      # Request handlers
-    │   ├── models/           # Database queries
-    │   ├── routes/           # API routes
-    │   ├── middleware/       # Auth middleware
-    │   └── config/
-    │       └── database.ts
-    ├── database/
-    │   └── init.sql          # Database schema
-    └── package.json
+├── pos-web/            # POS — React cashier screen
+│   └── src/
+│       ├── components/
+│       │   ├── cart/CheckoutModal.tsx
+│       │   └── receipt/ReceiptModal.tsx
+│       ├── pages/
+│       │   ├── LoginPage.tsx
+│       │   ├── POSPage.tsx
+│       │   └── SalesHistoryPage.tsx
+│       ├── context/AuthContext.tsx
+│       ├── hooks/useCart.ts
+│       └── services/api.ts
+│
+└── server/             # Shared Express backend
+    └── src/
+        ├── controllers/
+        │   ├── authController.ts
+        │   ├── productController.ts
+        │   ├── inventoryController.ts
+        │   └── posController.ts
+        ├── models/
+        │   └── productModel.ts
+        ├── routes/
+        │   ├── authRoutes.ts
+        │   ├── productRoutes.ts
+        │   ├── inventoryRoutes.ts
+        │   └── posRoutes.ts
+        ├── middleware/authMiddleware.ts
+        └── config/database.ts
 ```
 
 ---
 
-## 🔌 API Reference
+## 🏃 Quick Start
 
-Full API documentation available in [`API_DOCS.md`](./docs/API_DOCS.md)
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 14+
 
-### Authentication
-
-```
-POST   /api/auth/register     Register new user
-POST   /api/auth/login        Login (returns JWT token)
-GET    /api/auth/me           Get current user
-```
-
-### Products
-
-```
-GET    /api/products          Get all products with stock levels
-GET    /api/products/:id      Get single product
-POST   /api/products          Create product
-PUT    /api/products/:id      Update product
-DELETE /api/products/:id      Delete product
+### 1. Clone
+```bash
+git clone https://github.com/E7itism/stockerflow.git
+cd stockerflow
 ```
 
-### Categories
+### 2. Backend
+```bash
+cd server
+npm install
+cp .env.example .env
+# Fill in DATABASE_URL and JWT_SECRET
 
-```
-GET    /api/categories        Get all categories
-POST   /api/categories        Create category
-PUT    /api/categories/:id    Update category
-DELETE /api/categories/:id    Delete category
-```
-
-### Suppliers
-
-```
-GET    /api/suppliers         Get all suppliers
-POST   /api/suppliers         Create supplier
-PUT    /api/suppliers/:id     Update supplier
-DELETE /api/suppliers/:id     Delete supplier
+npm run build
+npm run migrate
+npm start
+# Runs on http://localhost:5000
 ```
 
-### Inventory
+### 3. STOCKER (Admin)
+```bash
+cd admin-web
+npm install
+cp .env.example .env
+# VITE_API_URL=http://localhost:5000/api
 
-```
-GET    /api/inventory/transactions              All transactions
-POST   /api/inventory/transactions              Create transaction
-GET    /api/inventory/transactions/recent       Recent activity
-GET    /api/inventory/stock/low                 Low stock products
-GET    /api/inventory/products/:id/stock        Get product stock level
+npm run dev
+# Opens at http://localhost:5173
 ```
 
-### Dashboard
+### 4. POS (Cashier)
+```bash
+cd pos-web
+npm install
+cp .env.example .env
+# VITE_API_URL=http://localhost:5000/api
 
-```
-GET    /api/dashboard/stats   Get all dashboard data
+npm run dev
+# Opens at http://localhost:5174
 ```
 
 ---
 
-## 🗄️ Database Schema
+## ⚙️ Environment Variables
 
-```sql
-users (
-  id, email, password_hash, first_name, last_name,
-  role ['admin'|'manager'|'staff'], created_at, updated_at
-)
-
-categories (
-  id, name UNIQUE, description, created_at
-)
-
-suppliers (
-  id, name, contact_person, email, phone, address, created_at
-)
-
-products (
-  id, sku UNIQUE, name, description,
-  category_id → categories(id),
-  supplier_id → suppliers(id),
-  unit_price DECIMAL(10,2), reorder_level DEFAULT 10,
-  created_at, updated_at
-)
-
-inventory_transactions (
-  id, product_id → products(id),
-  transaction_type ['in'|'out'|'adjustment'],
-  quantity, user_id → users(id), notes, created_at
-)
-
--- VIEW: current_stock
--- Calculates stock by summing all transactions per product
+### Backend (`server/.env`)
+```bash
+PORT=5000
+DATABASE_URL=postgresql://username:password@localhost:5432/stocker
+JWT_SECRET=your-secret-key-here
+NODE_ENV=development
 ```
 
-**Key Design Decision:** Stock is calculated, not stored. Current stock = SUM of all transactions for a product. This ensures data integrity and provides a complete audit trail.
+### Frontend (`admin-web/.env` and `pos-web/.env`)
+```bash
+VITE_API_URL=http://localhost:5000/api
+```
 
 ---
 
 ## 🚀 Deployment
 
 ### Frontend → Vercel
-
 1. Push to GitHub
-2. Import project in [vercel.com](https://vercel.com)
-3. Framework: **Create React App**
-4. Root directory: `client`
-5. Environment variable: `REACT_APP_API_URL=https://your-railway-url.railway.app/api`
-6. Deploy
+2. Import in [vercel.com](https://vercel.com)
+3. Set root directory to `admin-web` or `pos-web`
+4. Add environment variable: `VITE_API_URL=https://your-railway-url.railway.app/api`
+5. Deploy
 
 ### Backend → Railway
-
-1. Create new project in [railway.app](https://railway.app)
-2. Add PostgreSQL database service
-3. Deploy from GitHub repo
-4. Root directory: `server`
-5. Environment variables:
-   - `DATABASE_URL` (auto-filled by Railway)
-   - `JWT_SECRET` (generate a random string)
-   - `CORS_ORIGIN=https://your-vercel-url.vercel.app`
-   - `NODE_ENV=production`
-6. Deploy
-
----
-
-## 🧪 Testing
-
-### Test the deployed app:
-
-1. Visit your Vercel URL
-2. Login with your registered username and password
-3. Test all pages: Dashboard, Products, Categories, Suppliers, Inventory
-4. Try mobile view (F12 → phone icon)
-5. Check browser console for errors (F12)
+1. Create project in [railway.app](https://railway.app)
+2. Add PostgreSQL service
+3. Deploy from GitHub, root directory: `server`
+4. Set environment variables: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`
+5. Run migration: `npm run migrate`
 
 ---
 
 ## 📋 Changelog
 
+### v2.0.0 (February 2026)
+- ✅ Added full POS system (pos-web)
+- ✅ Monorepo structure (admin-web + pos-web + server)
+- ✅ Sales and sale_items tables with receipt snapshots
+- ✅ Automatic inventory sync — POS sales deduct from STOCKER
+- ✅ Mobile-first POS with tab navigation
+- ✅ Sales history page
+- ✅ unit_of_measure field on products
+
 ### v1.0.0 (February 2026)
-
-- ✅ Initial release
+- ✅ STOCKER inventory management system
 - ✅ Full CRUD for products, categories, suppliers
-- ✅ Inventory transaction tracking (in/out/adjustment)
-- ✅ Dashboard with real-time stats and charts
+- ✅ Dashboard with real-time stats
 - ✅ Low stock alerts
-- ✅ Mobile responsive design
-- ✅ JWT Authentication with bcrypt password hashing
-- ✅ Professional code documentation
-- ✅ Complete API documentation
-
----
-
-## 💡 Key Features Explained
-
-### Stock Calculation
-
-Stock is calculated dynamically from all transactions:
-
-- `type='in'` → adds stock
-- `type='out'` → removes stock
-- `type='adjustment'` → manual correction
-
-This approach ensures accurate stock levels and complete audit trail.
-
-### Low Stock Alerts
-
-Products with `current_stock <= reorder_level` appear in the dashboard alert card, helping you stay ahead of shortages.
-
-### Mobile Responsive
-
-- **Desktop:** Full table views with all columns
-- **Mobile:** Card-based views with touch-friendly buttons
-- **Tablet:** Optimized layouts for cashier/inventory management
+- ✅ JWT authentication
+- ✅ Mobile responsive
 
 ---
 
 ## 👨‍💻 Author
 
 **Eliezer Gaudiel Jr**
-
-- GitHub: ELIEZER GAUDIEL : https://github.com/E7itism
-- LinkedIn: ELIEZER GAUDIEL : www.linkedin.com/in/esgaudiel
+- GitHub: [E7itism](https://github.com/E7itism)
+- LinkedIn: [esgaudiel](https://www.linkedin.com/in/esgaudiel)
 - Location: Philippines
 
 ---
 
 ## 📜 License
 
-MIT License — feel free to use this project for learning or as a portfolio piece.
-
----
-
-## 🙏 Acknowledgments
-
-Built as a portfolio project to demonstrate full-stack development skills including:
-
-- React + TypeScript frontend development
-- Node.js + Express backend architecture
-- PostgreSQL database design
-- JWT authentication implementation
-- RESTful API design
-- Mobile-responsive UI/UX
-- Professional code documentation
-
----
-
-⭐ **If this project helped you, please give it a star!**
-
----
-
-## 📧 Questions?
-
-Found a bug? Have a question? Open an issue or reach out on LinkedIn.
+MIT License — feel free to use this for learning or as a portfolio piece.
