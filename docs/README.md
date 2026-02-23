@@ -10,40 +10,70 @@ Built as a **monorepo** — two apps, one backend, one database. Changes in STOC
 
 ## 🌐 Live Demo
 
-| App | URL |
-|---|---|
-| STOCKER (Admin) | [stockerflow.vercel.app](https://stockerflow.vercel.app) |
-| POS (Cashier) | _Coming soon_ |
+| App             | URL                                                              |
+| --------------- | ---------------------------------------------------------------- |
+| STOCKER (Admin) | [stockerflow.vercel.app](https://stockerflow.vercel.app)         |
+| POS (Cashier)   | [stockerflow-pos.vercel.app](https://stockerflow-pos.vercel.app) |
 
-| Test Account | Credentials |
-|---|---|
-| Email | demo@mail.com |
-| Password | demo123 |
+| Test Account | Credentials   |
+| ------------ | ------------- |
+| Email        | demo@mail.com |
+| Password     | demo123       |
 
 ---
 
 ## 📸 Screenshots
 
-### Dashboard
+### STOCKER — Dashboard
+
 ![Dashboard](screenshots/dashboard.PNG)
 
-### Products (Desktop)
+### STOCKER — Products (Desktop)
+
 ![Products Desktop](screenshots/products.PNG)
 
-### Inventory Transactions
+### STOCKER — Inventory Transactions
+
 ![Inventory](screenshots/inventory.PNG)
 
-### Dashboard (Mobile)
+### STOCKER — Dashboard (Mobile)
+
 ![Dashboard Mobile](screenshots/dashboard-mobile.PNG)
 
-### Products (Mobile)
+### STOCKER — Products (Mobile)
+
 ![Products Mobile](screenshots/products-mobile.PNG)
+
+### POS — Login
+
+![POS Login](screenshots/pos-login.PNG)
+
+### POS — Product Browser
+
+![POS Products](screenshots/pos-products.PNG)
+
+### POS — Cart
+
+![POS Cart](screenshots/pos-cart.PNG)
+
+### POS — Checkout
+
+![POS Checkout](screenshots/pos-checkout.PNG)
+
+### POS — Receipt
+
+![POS Receipt](screenshots/pos-receipt.PNG)
+
+### POS — Mobile View
+
+![POS Mobile](screenshots/pos-mobile.PNG)
 
 ---
 
 ## ✨ Features
 
 ### STOCKER (Admin Dashboard)
+
 - 📊 **Real-time Dashboard** — inventory value, low stock alerts, recent transactions
 - 📦 **Product Management** — full CRUD with unit of measure support
 - 📁 **Categories & Suppliers** — organize your inventory
@@ -52,6 +82,7 @@ Built as a **monorepo** — two apps, one backend, one database. Changes in STOC
 - 📱 **Mobile Responsive** — desktop table view + mobile card view
 
 ### POS (Cashier Screen)
+
 - 🛍️ **Product Browser** — searchable product grid with live stock levels
 - 🛒 **Cart** — add items, adjust quantities, remove items
 - 💵 **Checkout** — cash tendered + automatic change calculation
@@ -61,6 +92,7 @@ Built as a **monorepo** — two apps, one backend, one database. Changes in STOC
 - 👴 **Accessible** — large touch targets, clear labels, designed for non-tech-savvy users
 
 ### System-Wide
+
 - 🔄 **Automatic Sync** — POS sales instantly deduct from STOCKER inventory
 - 🔐 **JWT Authentication** — separate sessions for admin and cashier
 - 🇵🇭 **Philippine-ready** — VAT (12%), peso formatting, local units of measure
@@ -96,28 +128,31 @@ Built as a **monorepo** — two apps, one backend, one database. Changes in STOC
 ## 🛠️ Tech Stack
 
 ### Frontend (Both Apps)
-| Tech | Purpose |
-|---|---|
-| React 18 | UI Framework |
-| TypeScript | Type Safety |
-| Tailwind CSS | Styling |
-| React Router | Navigation |
-| Axios | API Calls |
-| Vite | Build Tool |
+
+| Tech         | Purpose      |
+| ------------ | ------------ |
+| React 18     | UI Framework |
+| TypeScript   | Type Safety  |
+| Tailwind CSS | Styling      |
+| React Router | Navigation   |
+| Axios        | API Calls    |
+| Vite         | Build Tool   |
 
 ### Backend
-| Tech | Purpose |
-|---|---|
-| Node.js | Runtime |
-| Express.js | Web Framework |
-| PostgreSQL | Database |
-| JWT | Authentication |
-| bcrypt | Password Hashing |
+
+| Tech       | Purpose          |
+| ---------- | ---------------- |
+| Node.js    | Runtime          |
+| Express.js | Web Framework    |
+| PostgreSQL | Database         |
+| JWT        | Authentication   |
+| bcrypt     | Password Hashing |
 
 ### Deployment
-| Service | Purpose |
-|---|---|
-| Vercel | Frontend Hosting |
+
+| Service | Purpose            |
+| ------- | ------------------ |
+| Vercel  | Frontend Hosting   |
 | Railway | Backend + Database |
 
 ---
@@ -164,6 +199,7 @@ sale_items (
 ```
 
 **Key decisions:**
+
 - **Stock is calculated, not stored** — `current_stock = SUM(transactions)`. Complete audit trail, always accurate.
 - **Snapshots in sale_items** — product name/price can change later. Receipts show what the customer actually paid.
 - **Atomic transactions** — sale + sale_items + inventory_transactions saved together. If anything fails, nothing saves.
@@ -173,6 +209,7 @@ sale_items (
 ## 🔌 API Reference
 
 ### Authentication
+
 ```
 POST  /api/auth/login        Login (returns JWT)
 POST  /api/auth/register     Register new user
@@ -180,6 +217,7 @@ GET   /api/auth/me           Get current user
 ```
 
 ### Products
+
 ```
 GET    /api/products          All products with stock levels
 GET    /api/products/:id      Single product
@@ -189,6 +227,7 @@ DELETE /api/products/:id      Delete product
 ```
 
 ### Inventory
+
 ```
 GET   /api/inventory/transactions        All transactions
 POST  /api/inventory/transactions        Create transaction
@@ -197,6 +236,7 @@ GET   /api/inventory/stock/low           Low stock products
 ```
 
 ### POS
+
 ```
 GET   /api/pos/products        Products with live stock (for cashier)
 GET   /api/pos/products/:id    Single product
@@ -210,7 +250,7 @@ GET   /api/pos/sales/:id       Single sale with line items
 ## 📁 Project Structure
 
 ```
-stocker/
+stockerflow/
 ├── admin-web/          # STOCKER — React admin dashboard
 │   └── src/
 │       ├── components/
@@ -242,6 +282,9 @@ stocker/
 │       └── services/api.ts
 │
 └── server/             # Shared Express backend
+    ├── migrations/
+    │   ├── 001_init.sql
+    │   └── 002_add_pos_tables.sql
     └── src/
         ├── controllers/
         │   ├── authController.ts
@@ -256,7 +299,8 @@ stocker/
         │   ├── inventoryRoutes.ts
         │   └── posRoutes.ts
         ├── middleware/authMiddleware.ts
-        └── config/database.ts
+        ├── config/database.ts
+        └── runMigration.ts
 ```
 
 ---
@@ -264,16 +308,19 @@ stocker/
 ## 🏃 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+
 - PostgreSQL 14+
 
 ### 1. Clone
+
 ```bash
 git clone https://github.com/E7itism/stockerflow.git
 cd stockerflow
 ```
 
 ### 2. Backend
+
 ```bash
 cd server
 npm install
@@ -287,6 +334,7 @@ npm start
 ```
 
 ### 3. STOCKER (Admin)
+
 ```bash
 cd admin-web
 npm install
@@ -298,6 +346,7 @@ npm run dev
 ```
 
 ### 4. POS (Cashier)
+
 ```bash
 cd pos-web
 npm install
@@ -313,6 +362,7 @@ npm run dev
 ## ⚙️ Environment Variables
 
 ### Backend (`server/.env`)
+
 ```bash
 PORT=5000
 DATABASE_URL=postgresql://username:password@localhost:5432/stocker
@@ -321,6 +371,7 @@ NODE_ENV=development
 ```
 
 ### Frontend (`admin-web/.env` and `pos-web/.env`)
+
 ```bash
 VITE_API_URL=http://localhost:5000/api
 ```
@@ -330,24 +381,36 @@ VITE_API_URL=http://localhost:5000/api
 ## 🚀 Deployment
 
 ### Frontend → Vercel
+
 1. Push to GitHub
 2. Import in [vercel.com](https://vercel.com)
 3. Set root directory to `admin-web` or `pos-web`
 4. Add environment variable: `VITE_API_URL=https://your-railway-url.railway.app/api`
-5. Deploy
+5. Add `vercel.json` in the app folder for SPA routing:
+
+```json
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+6. Deploy
 
 ### Backend → Railway
+
 1. Create project in [railway.app](https://railway.app)
 2. Add PostgreSQL service
 3. Deploy from GitHub, root directory: `server`
 4. Set environment variables: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`
-5. Run migration: `npm run migrate`
+5. Pre-deploy command: `npm run build`
+6. Start command: `npm run deploy` (runs migrate then start)
 
 ---
 
 ## 📋 Changelog
 
 ### v2.0.0 (February 2026)
+
 - ✅ Added full POS system (pos-web)
 - ✅ Monorepo structure (admin-web + pos-web + server)
 - ✅ Sales and sale_items tables with receipt snapshots
@@ -355,8 +418,11 @@ VITE_API_URL=http://localhost:5000/api
 - ✅ Mobile-first POS with tab navigation
 - ✅ Sales history page
 - ✅ unit_of_measure field on products
+- ✅ Sequential migration system
+- ✅ Deployed POS to Vercel
 
 ### v1.0.0 (February 2026)
+
 - ✅ STOCKER inventory management system
 - ✅ Full CRUD for products, categories, suppliers
 - ✅ Dashboard with real-time stats
@@ -369,6 +435,7 @@ VITE_API_URL=http://localhost:5000/api
 ## 👨‍💻 Author
 
 **Eliezer Gaudiel Jr**
+
 - GitHub: [E7itism](https://github.com/E7itism)
 - LinkedIn: [esgaudiel](https://www.linkedin.com/in/esgaudiel)
 - Location: Philippines
