@@ -5,6 +5,11 @@
  * Fetches products, categories, and suppliers together so the UI
  * can show names instead of raw IDs.
  *
+ * ROLE-BASED BEHAVIOUR:
+ * - All roles can VIEW products
+ * - Admin + Manager can ADD and EDIT products
+ * - Admin only can DELETE products
+ *
  * Desktop: table view | Mobile: card view
  * Modal: extracted to components/Products/ProductModal.tsx
  */
@@ -13,6 +18,7 @@ import { useEffect, useState } from 'react';
 import { productsAPI, categoriesAPI, suppliersAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 import { ProductModal } from '../components/Products/ProductModal';
+import { useRole } from '../hooks/useRole';
 
 export interface Product {
   id: number;
@@ -51,6 +57,12 @@ export const ProductsPage: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  /**
+   * useRole gives us clean boolean flags instead of scattering
+   * user?.role === 'admin' comparisons throughout the component.
+   */
+  const { canEdit, canDelete } = useRole();
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -61,11 +73,6 @@ export const ProductsPage: React.FC = () => {
    * Why Promise.all?
    * Runs all 3 requests simultaneously instead of one after another.
    * Faster for the user — total wait time = slowest request, not sum of all.
-   *
-   * Why enrich products with category_name and supplier_name?
-   * Products store foreign key IDs, not names. We do the lookup once here
-   * so child components (table, cards) can just render product.category_name
-   * without needing their own lookup logic.
    */
   const fetchData = async () => {
     try {
@@ -104,12 +111,12 @@ export const ProductsPage: React.FC = () => {
   };
 
   const handleAddProduct = () => {
-    setEditingProduct(null); // null = create mode
+    setEditingProduct(null);
     setShowModal(true);
   };
 
   const handleEditProduct = (product: Product) => {
-    setEditingProduct(product); // non-null = edit mode
+    setEditingProduct(product);
     setShowModal(true);
   };
 
@@ -129,7 +136,6 @@ export const ProductsPage: React.FC = () => {
     await fetchData();
   };
 
-  // Client-side filter — searches name, SKU, and category simultaneously
   const filteredProducts = products.filter(
     (product) =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -160,12 +166,19 @@ export const ProductsPage: React.FC = () => {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
               />
             </div>
-            <button
-              onClick={handleAddProduct}
-              className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-base"
-            >
-              + Add Product
-            </button>
+
+            {/**
+             * Add Product button — only shown to admin and manager.
+             * Staff can browse products but not add new ones.
+             */}
+            {canEdit && (
+              <button
+                onClick={handleAddProduct}
+                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-base"
+              >
+                + Add Product
+              </button>
+            )}
           </div>
         </div>
 
@@ -183,6 +196,8 @@ export const ProductsPage: React.FC = () => {
                 products={filteredProducts}
                 onEdit={handleEditProduct}
                 onDelete={handleDeleteProduct}
+                canEdit={canEdit}
+                canDelete={canDelete}
               />
             </div>
 
@@ -192,6 +207,8 @@ export const ProductsPage: React.FC = () => {
                 products={filteredProducts}
                 onEdit={handleEditProduct}
                 onDelete={handleDeleteProduct}
+                canEdit={canEdit}
+                canDelete={canDelete}
               />
             </div>
           </>
@@ -219,12 +236,16 @@ interface TableProps {
   products: Product[];
   onEdit: (product: Product) => void;
   onDelete: (id: number) => void;
+  canEdit: boolean;
+  canDelete: boolean;
 }
 
 const ProductsTable: React.FC<TableProps> = ({
   products,
   onEdit,
   onDelete,
+  canEdit,
+  canDelete,
 }) => {
   const getStockColor = (stock: number, reorderLevel: number) => {
     if (stock <= 0) return 'text-red-600 bg-red-50';
@@ -267,9 +288,15 @@ const ProductsTable: React.FC<TableProps> = ({
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
                 Stock
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                Actions
-              </th>
+              {/**
+               * Only render the Actions column header if the user
+               * can do at least one action. Avoids an empty column for staff.
+               */}
+              {(canEdit || canDelete) && (
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -297,22 +324,39 @@ const ProductsTable: React.FC<TableProps> = ({
                     {product.current_stock || 0}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => onEdit(product)}
-                      className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 text-sm font-medium"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => onDelete(product.id)}
-                      className="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm font-medium"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
+
+                {(canEdit || canDelete) && (
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      {/**
+                       * Edit — admin and manager
+                       * Conditionally rendered, not just disabled,
+                       * so staff see a clean table with no dead buttons.
+                       */}
+                      {canEdit && (
+                        <button
+                          onClick={() => onEdit(product)}
+                          className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 text-sm font-medium"
+                        >
+                          Edit
+                        </button>
+                      )}
+
+                      {/**
+                       * Delete — admin only
+                       * Most destructive action, highest restriction.
+                       */}
+                      {canDelete && (
+                        <button
+                          onClick={() => onDelete(product.id)}
+                          className="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm font-medium"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -330,6 +374,8 @@ const ProductsCards: React.FC<TableProps> = ({
   products,
   onEdit,
   onDelete,
+  canEdit,
+  canDelete,
 }) => {
   const getStockColor = (stock: number, reorderLevel: number) => {
     if (stock <= 0) return 'bg-red-500';
@@ -393,20 +439,27 @@ const ProductsCards: React.FC<TableProps> = ({
             </div>
           </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={() => onEdit(product)}
-              className="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium text-sm"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => onDelete(product.id)}
-              className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium text-sm"
-            >
-              Delete
-            </button>
-          </div>
+          {/* Only show action buttons if the user has at least one permission */}
+          {(canEdit || canDelete) && (
+            <div className="flex gap-2">
+              {canEdit && (
+                <button
+                  onClick={() => onEdit(product)}
+                  className="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium text-sm"
+                >
+                  Edit
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={() => onDelete(product.id)}
+                  className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium text-sm"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ))}
     </div>
