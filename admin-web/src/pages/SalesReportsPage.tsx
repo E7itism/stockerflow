@@ -8,6 +8,7 @@
  * 2. Top 5 selling products (by units sold)
  * 3. Paginated sales list — each row expandable to show line items
  * 4. Date range filter — preset shortcuts + custom date inputs
+ * 5. CSV export — downloads all sales + line items for the current date range
  *
  * DATA FLOW:
  * - On mount → fetch summary + sales list for default range (last 30 days)
@@ -54,6 +55,66 @@ const formatDateTime = (iso: string): string =>
 
 /** Returns YYYY-MM-DD string for a Date (used to seed date inputs). */
 const toDateInput = (d: Date): string => d.toISOString().split('T')[0];
+
+// ─────────────────────────────────────────────────────────────────
+// CSV EXPORT HELPERS
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Escapes a single CSV cell value.
+ *
+ * WHY wrap in quotes and escape inner quotes?
+ * CSV cells containing commas, newlines, or quote characters must be
+ * wrapped in double quotes. Any existing double quotes inside the value
+ * are escaped by doubling them — "" is the CSV standard for a literal ".
+ * Without this, a product name like `Coca-Cola, 1.5L` would break columns.
+ */
+const escapeCsvCell = (value: string | number): string => {
+  const str = String(value);
+  if (/[",\n\r]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+};
+
+/** Converts a 2D array of values into a CSV string. */
+const buildCsv = (rows: (string | number)[][]): string =>
+  rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n');
+
+/**
+ * Triggers a browser file download for the given CSV string.
+ *
+ * HOW IT WORKS:
+ * 1. Create a Blob from the CSV text
+ * 2. Generate a temporary object URL pointing to that blob
+ * 3. Create a hidden <a> tag, set href + download attribute, click it
+ * 4. Clean up the object URL immediately (prevents memory leaks)
+ *
+ * WHY client-side instead of a backend download endpoint?
+ * The data is already in the browser — sending it to the server just to
+ * get it back as a file is wasteful. Client-side is instant and works offline.
+ *
+ * WHY the BOM prefix?
+ * The UTF-8 BOM (\uFEFF) tells Excel to correctly detect UTF-8 encoding.
+ * Without it, the ₱ symbol and other special characters render as garbled text.
+ */
+const downloadCsv = (csvString: string, filename: string): void => {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csvString], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.style.display = 'none';
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // Free the object URL — no longer needed after the click
+  URL.revokeObjectURL(url);
+};
 
 // ─────────────────────────────────────────────────────────────────
 // DATE PRESET SHORTCUTS
@@ -119,6 +180,11 @@ export const SalesReportsPage: React.FC = () => {
     Record<number, SaleItem[]>
   >({});
   const [itemsLoading, setItemsLoading] = useState(false);
+
+  // ── Export state ───────────────────────────────────────────────
+  // Separate loading flag so the export button shows a spinner
+  // without affecting the rest of the page
+  const [exportLoading, setExportLoading] = useState(false);
 
   // ─────────────────────────────────────────────────────────────
   // DATA FETCHING
@@ -220,8 +286,109 @@ export const SalesReportsPage: React.FC = () => {
   };
 
   // ─────────────────────────────────────────────────────────────
-  // INITIAL LOADING STATE — matches DashboardPage full-screen spinner
+  // CSV EXPORT
   // ─────────────────────────────────────────────────────────────
+
+  /**
+   * handleExport — fetches ALL sales for the current date range,
+   * then fetches line items for each sale, and builds a flat CSV.
+   *
+   * WHY fetch all sales with limit=9999 instead of reusing `sales` state?
+   * The table is paginated — `sales` only holds the current page (20 rows).
+   * The export should include every transaction in the date range, not just
+   * what's visible on screen.
+   *
+   * CSV STRUCTURE (flat — one row per line item):
+   * Sale ID | Date | Cashier | Payment | Product | Qty | Unit Price | Subtotal | Sale Total
+   *
+   * WHY flatten into one row per line item instead of one row per sale?
+   * A flat structure opens correctly in Excel without any pivoting needed.
+   * The sale-level fields (ID, date, cashier) repeat on each item row —
+   * this is the standard format for transaction exports.
+   */
+  const handleExport = async () => {
+    setExportLoading(true);
+    try {
+      // Step 1: Fetch all sales for the date range (no pagination)
+      const allSalesData = await reportsAPI.getSales(
+        { from: dateFrom, to: dateTo },
+        1,
+        9999, // high limit to get everything in one request
+      );
+
+      if (allSalesData.sales.length === 0) {
+        toast.error('No sales to export for this date range');
+        return;
+      }
+
+      // Step 2: Fetch line items for every sale in parallel
+      // Promise.all runs all requests simultaneously — much faster than sequential awaits
+      const itemsPerSale = await Promise.all(
+        allSalesData.sales.map((sale) => reportsAPI.getSaleItems(sale.id)),
+      );
+
+      // Step 3: Build the CSV rows — one row per line item
+      const headers = [
+        'Sale ID',
+        'Date',
+        'Cashier',
+        'Payment Method',
+        'Product',
+        'Unit of Measure',
+        'Qty',
+        'Unit Price (₱)',
+        'Subtotal (₱)',
+        'Sale Total (₱)',
+      ];
+
+      const dataRows = allSalesData.sales.flatMap((sale, saleIndex) => {
+        const items = itemsPerSale[saleIndex];
+
+        // If a sale somehow has no items, still include a row for it
+        if (items.length === 0) {
+          return [
+            [
+              sale.id,
+              formatDateTime(sale.created_at),
+              sale.cashier_name,
+              sale.payment_method,
+              '-',
+              '-',
+              '-',
+              '-',
+              '-',
+              Number(sale.total_amount).toFixed(2),
+            ],
+          ];
+        }
+
+        return items.map((item) => [
+          sale.id,
+          formatDateTime(sale.created_at),
+          sale.cashier_name,
+          sale.payment_method,
+          item.product_name,
+          item.unit_of_measure,
+          item.quantity,
+          Number(item.unit_price).toFixed(2),
+          Number(item.subtotal).toFixed(2),
+          Number(sale.total_amount).toFixed(2),
+        ]);
+      });
+
+      const csv = buildCsv([headers, ...dataRows]);
+
+      // Filename includes the date range so exported files are easy to identify
+      const filename = `sales-report_${dateFrom}_to_${dateTo}.csv`;
+      downloadCsv(csv, filename);
+
+      toast.success(`Exported ${allSalesData.sales.length} transactions`);
+    } catch {
+      toast.error('Failed to export CSV');
+    } finally {
+      setExportLoading(false);
+    }
+  };
 
   if (summaryLoading && !summary) {
     return (
@@ -293,6 +460,24 @@ export const SalesReportsPage: React.FC = () => {
                 onChange={(e) => handleCustomTo(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+            </div>
+
+            {/* Export button — sits at the end of the filter bar */}
+            <div className="sm:ml-auto">
+              <button
+                onClick={handleExport}
+                disabled={exportLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {exportLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>⬇️ Export CSV</>
+                )}
+              </button>
             </div>
           </div>
         </div>
