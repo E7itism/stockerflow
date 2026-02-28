@@ -26,6 +26,7 @@ import { ProductsPage } from './pages/ProductsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { SuppliersPage } from './pages/SupplierPage';
 import { InventoryPage } from './pages/InventoryPage';
+import { SalesReportsPage } from './pages/SalesReportsPage';
 
 /**
  * App Component
@@ -175,6 +176,14 @@ function App() {
            * If not logged in, ProtectedRoute will send to login
            */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <SalesReportsPage />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
