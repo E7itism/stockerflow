@@ -33,6 +33,7 @@ import { CategoriesPage } from './pages/CategoriesPage';
 import { SuppliersPage } from './pages/SupplierPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { SalesReportsPage } from './pages/SalesReportsPage';
+import { UsersPage } from './pages/UsersPage';
 
 function App() {
   return (
@@ -116,6 +117,19 @@ function App() {
             element={
               <RoleProtectedRoute allowedRoles={['admin', 'manager']}>
                 <SalesReportsPage />
+              </RoleProtectedRoute>
+            }
+          />
+
+          {/**
+           * User Management — admin only
+           * Creating/deactivating accounts is the highest privilege
+           */}
+          <Route
+            path="/users"
+            element={
+              <RoleProtectedRoute allowedRoles={['admin']}>
+                <UsersPage />
               </RoleProtectedRoute>
             }
           />

@@ -377,5 +377,50 @@ export const reportsAPI = {
     return response.data.items;
   },
 };
+// ═══════════════════════════════════════════════════════════════════
+// USERS (Admin only)
+// ═══════════════════════════════════════════════════════════════════
+
+/** Shape of a user record returned by the API */
+export interface UserRecord {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export const usersAPI = {
+  /** GET /api/users — returns all users */
+  getAll: async (): Promise<UserRecord[]> => {
+    const response = await api.get<{ users: UserRecord[] }>('/users');
+    return response.data.users;
+  },
+
+  /**
+   * PUT /api/users/:id/role
+   * Changes a user's role. Returns the updated user record.
+   */
+  updateRole: async (id: number, role: string): Promise<UserRecord> => {
+    const response = await api.put<{ user: UserRecord }>(`/users/${id}/role`, {
+      role,
+    });
+    return response.data.user;
+  },
+
+  /**
+   * PUT /api/users/:id/status
+   * Activates or deactivates a user. Returns the updated user record.
+   */
+  updateStatus: async (id: number, is_active: boolean): Promise<UserRecord> => {
+    const response = await api.put<{ user: UserRecord }>(
+      `/users/${id}/status`,
+      { is_active },
+    );
+    return response.data.user;
+  },
+};
 
 export default api;

@@ -70,6 +70,12 @@ export const Sidebar: React.FC<Props> = ({ onLinkClick }) => {
       label: 'Sales Reports',
       roles: ['admin', 'manager'],
     },
+    {
+      path: '/users',
+      icon: '👥',
+      label: 'User Management',
+      roles: ['admin'],
+    },
   ];
 
   /**
@@ -79,7 +85,7 @@ export const Sidebar: React.FC<Props> = ({ onLinkClick }) => {
    * Items with `roles`    → included only if user has one of those roles
    */
   const visibleMenuItems = allMenuItems.filter(
-    (item) => !item.roles || hasRole(...item.roles),
+    (item) => !item.roles || hasRole(...(item.roles as string[])),
   );
 
   return (

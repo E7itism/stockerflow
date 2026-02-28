@@ -83,14 +83,15 @@ class AuthController {
   async login(req: Request, res: Response): Promise<void> {
     try {
       const { email, password } = req.body;
-
+      console.log('Login attempt:', { email, password });
       if (!email || !password) {
         res.status(400).json({ error: 'Email and password are required' });
         return;
       }
 
       const user = await userModel.findByEmail(email);
-
+      console.log('User found:', user);
+      console.log('Stored hash:', user?.password_hash);
       /**
        * Why same error for wrong email AND wrong password?
        * If we said "email not found" for unknown emails, an attacker
@@ -107,8 +108,31 @@ class AuthController {
         password,
         user.password_hash,
       );
+
       if (!isPasswordValid) {
         res.status(401).json({ error: 'Invalid email or password' });
+        return;
+      }
+
+      /**
+       * Block deactivated accounts from logging in.
+       *
+       * WHY check here instead of just relying on frontend?
+       * A deactivated user still has a valid password. Without this check,
+       * they could log in and get a fresh JWT even after being deactivated.
+       * The backend is the real gate — the frontend check is just UX.
+       *
+       * WHY 403 instead of 401?
+       * 401 = "I don't know who you are" (wrong credentials)
+       * 403 = "I know who you are, but you're not allowed"
+       * A deactivated user provided correct credentials — we know who they
+       * are, we're just not letting them in. 403 is the right status.
+       */
+      if (!user.is_active) {
+        res.status(403).json({
+          error:
+            'Your account has been deactivated. Please contact an administrator.',
+        });
         return;
       }
 

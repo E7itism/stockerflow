@@ -21,6 +21,7 @@ interface User {
   first_name: string;
   last_name: string;
   role: 'admin' | 'manager' | 'staff';
+  is_active: boolean;
   created_at: Date;
   updated_at: Date;
 }
