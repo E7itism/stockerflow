@@ -46,6 +46,7 @@ export const Sidebar: React.FC<Props> = ({ onLinkClick }) => {
     { path: '/categories', icon: '📁', label: 'Categories' },
     { path: '/suppliers', icon: '🏢', label: 'Suppliers' },
     { path: '/inventory', icon: '📋', label: 'Inventory' },
+    { path: '/reports', icon: '📈', label: 'Sales Reports' },
   ];
 
   return (

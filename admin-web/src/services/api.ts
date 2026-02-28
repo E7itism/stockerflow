@@ -271,5 +271,111 @@ export const inventoryAPI = {
     return response.data;
   },
 };
+// ═══════════════════════════════════════════════════════════════════
+// SALES REPORTS
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Date range params reused across report endpoints.
+ * Both are optional — the backend defaults to last 30 days if omitted.
+ */
+export interface ReportDateRange {
+  from?: string; // YYYY-MM-DD
+  to?: string; // YYYY-MM-DD
+}
+
+/** Shape returned by GET /api/reports/summary */
+export interface ReportSummary {
+  date_range: { from: string; to: string };
+  summary: {
+    total_revenue: number;
+    transaction_count: number;
+    avg_transaction_value: number;
+  };
+  top_products: {
+    product_name: string;
+    total_quantity: number;
+    total_revenue: number;
+  }[];
+}
+
+/** Single sale row returned by GET /api/reports/sales */
+export interface SaleRecord {
+  id: number;
+  cashier_id: number;
+  cashier_name: string;
+  total_amount: string;
+  cash_tendered: string;
+  change_amount: string;
+  payment_method: string;
+  created_at: string;
+}
+
+/** Shape returned by GET /api/reports/sales */
+export interface SalesListResponse {
+  sales: SaleRecord[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    total_pages: number;
+  };
+}
+
+/** Single line item for an expanded sale */
+export interface SaleItem {
+  product_name: string;
+  quantity: number;
+  unit_price: string;
+  unit_of_measure: string;
+  subtotal: string;
+}
+
+export const reportsAPI = {
+  /**
+   * Fetches revenue summary and top products.
+   * Called once on page load and whenever the date filter changes.
+   */
+  getSummary: async (range: ReportDateRange = {}): Promise<ReportSummary> => {
+    const params = new URLSearchParams();
+    if (range.from) params.append('from', range.from);
+    if (range.to) params.append('to', range.to);
+
+    const response = await api.get<ReportSummary>(`/reports/summary?${params}`);
+    return response.data;
+  },
+
+  /**
+   * Fetches paginated sales list.
+   * page and limit are optional — backend defaults to page 1, limit 20.
+   */
+  getSales: async (
+    range: ReportDateRange = {},
+    page = 1,
+    limit = 20,
+  ): Promise<SalesListResponse> => {
+    const params = new URLSearchParams();
+    if (range.from) params.append('from', range.from);
+    if (range.to) params.append('to', range.to);
+    params.append('page', String(page));
+    params.append('limit', String(limit));
+
+    const response = await api.get<SalesListResponse>(
+      `/reports/sales?${params}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Fetches line items for one sale.
+   * Only called when the user expands a row — not preloaded.
+   */
+  getSaleItems: async (saleId: number): Promise<SaleItem[]> => {
+    const response = await api.get<{ items: SaleItem[] }>(
+      `/reports/sales/${saleId}/items`,
+    );
+    return response.data.items;
+  },
+};
 
 export default api;

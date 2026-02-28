@@ -10,7 +10,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import pool from './config/database.js';
+import pool from './config/database';
 import authRoutes from './routes/authRoutes';
 import productRoutes from './routes/productRoutes';
 import categoryRoutes from './routes/categoryRoutes';
@@ -18,6 +18,7 @@ import supplierRoutes from './routes/supplierRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import inventoryRoutes from './routes/inventoryRoutes';
 import posRoutes from './routes/posRoutes';
+import reportsRoutes from './routes/reportsRoutes';
 
 dotenv.config(); // Load .env variables into process.env
 
@@ -85,6 +86,7 @@ app.use('/api/suppliers', supplierRoutes); // CRUD /api/suppliers
 app.use('/api/dashboard', dashboardRoutes); // GET  /api/dashboard/stats
 app.use('/api/inventory', inventoryRoutes); // CRUD /api/inventory/transactions
 app.use('/api/pos', posRoutes); // GET /api/pos/products, POST /api/pos/sales
+app.use('/api/reports', reportsRoutes);
 
 /**
  * Root route — API documentation/discovery.
@@ -148,3 +150,5 @@ app.get('/health', async (req: Request, res: Response) => {
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
+
+export default app;
