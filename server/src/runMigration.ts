@@ -22,13 +22,17 @@
 import fs from 'fs';
 import path from 'path';
 import { Pool } from 'pg';
+import 'dotenv/config';
 
+console.log('DATABASE_URL:', process.env.DATABASE_URL);
 const runMigration = async () => {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false }, // Required for Railway SSL connections
+    ssl:
+      process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: false }
+        : false, // Required for Railway SSL connections
   });
-
   try {
     // Find all .sql files in migrations/ folder, sorted alphabetically
     // Alphabetical order = chronological order because of our naming convention (001, 002, etc.)
