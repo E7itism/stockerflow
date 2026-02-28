@@ -77,7 +77,7 @@ export const LoginPage: React.FC = () => {
             disabled={loading}
             className="w-full py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 text-sm font-medium transition-colors"
           >
-            {loading ? 'Signing in...' : '🚀 Try Demo Account'}
+            {loading ? 'Signing in...' : 'Try Demo Account'}
           </button>
         </div>
 
