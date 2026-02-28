@@ -14,9 +14,14 @@
  *   - High contrast text
  *   - Obvious feedback on every action
  *   - Cart badge always visible so cashier knows items are added
+ *
+ * CATEGORY FILTER:
+ * Buttons extracted from the loaded product list — no extra API call needed.
+ * Works together with the search box: search narrows by name/SKU,
+ * category filter narrows by category. Both can be active at once.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../hooks/useCart';
@@ -31,8 +36,8 @@ type Tab = 'products' | 'cart';
 
 export default function POSPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('products');
   const [showCheckout, setShowCheckout] = useState(false);
@@ -54,34 +59,59 @@ export default function POSPage() {
     loadProducts();
   }, []);
 
-  useEffect(() => {
-    if (!search.trim()) {
-      setFilteredProducts(products);
-      return;
-    }
-    const q = search.toLowerCase();
-    setFilteredProducts(
-      products.filter(
-        (p) =>
-          p.name?.toLowerCase().includes(q) ||
-          p.sku?.toLowerCase().includes(q) ||
-          p.category_name?.toLowerCase().includes(q),
-      ),
-    );
-  }, [search, products]);
-
   async function loadProducts() {
     try {
       setLoadingProducts(true);
       const data = await productAPI.getAll();
       setProducts(data);
-      setFilteredProducts(data);
     } catch {
       toast.error('Failed to load products');
     } finally {
       setLoadingProducts(false);
     }
   }
+
+  /**
+   * categories — derived from the loaded products.
+   *
+   * WHY useMemo?
+   * Products don't change after load. Without memoization, this would
+   * recalculate on every render (every keystroke in the search box).
+   * useMemo caches the result and only recalculates when `products` changes.
+   *
+   * WHY 'All' prepended?
+   * 'All' is the default state — shows every product regardless of category.
+   */
+  const categories = useMemo(() => {
+    const unique = Array.from(
+      new Set(products.map((p) => p.category_name).filter(Boolean)),
+    ).sort();
+    return ['All', ...unique];
+  }, [products]);
+
+  /**
+   * filteredProducts — applies both search and category filter together.
+   *
+   * WHY useMemo instead of useEffect + setState?
+   * filteredProducts is derived state — it's always computed from
+   * products + search + selectedCategory. Using useMemo avoids the extra
+   * render cycle that useState would cause.
+   */
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      const matchesCategory =
+        selectedCategory === 'All' || p.category_name === selectedCategory;
+
+      const q = search.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        p.name?.toLowerCase().includes(q) ||
+        p.sku?.toLowerCase().includes(q) ||
+        p.category_name?.toLowerCase().includes(q);
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [products, search, selectedCategory]);
 
   function handleAddToCart(product: Product) {
     if (product.current_stock <= 0) {
@@ -103,7 +133,6 @@ export default function POSPage() {
     setCompletedSaleId(null);
   }
 
-  // Total quantity across all cart items — shown on tab badge
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
@@ -161,26 +190,72 @@ export default function POSPage() {
 
       {/* ── MAIN CONTENT ────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* ── PRODUCTS PANEL ──────────────────────────────────
-            Mobile: shown only on products tab
-            Desktop: always visible on the left
-        ────────────────────────────────────────────────────── */}
+        {/* ── PRODUCTS PANEL ────────────────────────────────── */}
         <div
           className={`
-          flex-1 flex-col overflow-hidden border-r border-gray-200
-          ${activeTab === 'products' ? 'flex' : 'hidden'}
-          md:flex
-        `}
+            flex-1 flex-col overflow-hidden border-r border-gray-200
+            ${activeTab === 'products' ? 'flex' : 'hidden'}
+            md:flex
+          `}
         >
-          {/* Search */}
-          <div className="p-3 bg-white border-b border-gray-200">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search products..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-base"
-            />
+          {/* Search + Category filter */}
+          <div className="bg-white border-b border-gray-200">
+            {/* Search box */}
+            <div className="p-3 pb-2">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search products..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent text-base"
+              />
+            </div>
+
+            {/**
+             * Category filter buttons
+             *
+             * WHY horizontal scroll instead of wrapping?
+             * On mobile the buttons would push the product grid down and
+             * reduce visible products. Horizontal scroll keeps the layout
+             * compact and predictable regardless of how many categories exist.
+             *
+             * Only rendered once products have loaded (categories would be
+             * empty and show nothing useful during loading anyway).
+             */}
+            {!loadingProducts && categories.length > 1 && (
+              <div className="flex gap-2 px-3 pb-3 overflow-x-auto scrollbar-hide">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      selectedCategory === cat
+                        ? 'bg-green-500 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {cat}
+                    {/**
+                     * Show product count per category so cashiers know
+                     * how many items are in each section before clicking.
+                     * 'All' shows total count across all categories.
+                     */}
+                    <span
+                      className={`ml-1.5 text-xs ${
+                        selectedCategory === cat
+                          ? 'text-green-100'
+                          : 'text-gray-400'
+                      }`}
+                    >
+                      {cat === 'All'
+                        ? products.length
+                        : products.filter((p) => p.category_name === cat)
+                            .length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product grid */}
@@ -192,7 +267,26 @@ export default function POSPage() {
             ) : filteredProducts.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
                 <span className="text-5xl">🔍</span>
-                <p className="text-base">No products found for "{search}"</p>
+                <p className="text-base">
+                  {search
+                    ? `No products found for "${search}"`
+                    : `No products in ${selectedCategory}`}
+                </p>
+                {/**
+                 * Reset button — shown when filters produce empty results.
+                 * Gives the cashier a quick escape hatch back to all products.
+                 */}
+                {(search || selectedCategory !== 'All') && (
+                  <button
+                    onClick={() => {
+                      setSearch('');
+                      setSelectedCategory('All');
+                    }}
+                    className="text-sm text-green-600 hover:text-green-700 font-medium"
+                  >
+                    Clear filters
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -224,16 +318,13 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* ── CART PANEL ──────────────────────────────────────
-            Mobile: shown only on cart tab
-            Desktop: always visible on the right
-        ────────────────────────────────────────────────────── */}
+        {/* ── CART PANEL ────────────────────────────────────── */}
         <div
           className={`
-          w-full md:w-80 xl:w-96 flex-col bg-white overflow-hidden
-          ${activeTab === 'cart' ? 'flex' : 'hidden'}
-          md:flex
-        `}
+            w-full md:w-80 xl:w-96 flex-col bg-white overflow-hidden
+            ${activeTab === 'cart' ? 'flex' : 'hidden'}
+            md:flex
+          `}
         >
           {/* Cart header */}
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">

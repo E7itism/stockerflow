@@ -11,6 +11,10 @@
  *
  * Note: Cashier accounts are created by the admin in STOCKER.
  * There is no self-registration on this app intentionally.
+ *
+ * DEMO BUTTON:
+ * Pre-fills admin@demo.com / demo123 so portfolio viewers can
+ * try the POS immediately without creating an account.
  */
 
 import { useState } from 'react';
@@ -19,49 +23,43 @@ import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 
 export default function LoginPage() {
-  // Controlled inputs for the login form
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
-  // Error message shown to the user if login fails
   const [error, setError] = useState('');
-
-  // Prevents double submission while the API call is in flight
   const [loading, setLoading] = useState(false);
 
-  // login() saves the user to localStorage and updates auth state
   const { login } = useAuth();
-
-  // Used to redirect to POS screen after successful login
   const navigate = useNavigate();
 
-  /**
-   * handleSubmit
-   *
-   * Sends credentials to the backend. On success, persists the
-   * user session and navigates to the POS screen. On failure,
-   * displays the error message returned by the API.
-   */
   const handleSubmit = async (e: React.FormEvent) => {
-    // Prevent default HTML form behavior (page reload)
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      // authAPI.login returns the full user object including JWT token
       const user = await authAPI.login(email, password);
-
-      // Persist session — stores in localStorage so it survives page refresh
       login(user);
-
-      // Redirect to main cashier screen
       navigate('/');
     } catch (err: any) {
-      // Show the server's error message if available, otherwise a fallback
       setError(err.response?.data?.error || 'Login failed');
     } finally {
-      // Always re-enable the button whether login succeeded or failed
+      setLoading(false);
+    }
+  };
+
+  /**
+   * handleDemoLogin — logs in as the demo admin account directly.
+   * Same pattern as STOCKER's demo button — one click, no typing.
+   */
+  const handleDemoLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const user = await authAPI.login('admin@demo.com', 'demo123');
+      login(user);
+      navigate('/');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Demo login failed');
+    } finally {
       setLoading(false);
     }
   };
@@ -75,15 +73,38 @@ export default function LoginPage() {
           <p className="text-gray-500 mt-2">Cashier sign in</p>
         </div>
 
-        {/* Error banner — only rendered when there is an error message */}
+        {/* Demo credentials banner */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-6">
+          <p className="text-xs text-green-600 font-medium uppercase tracking-wide mb-1">
+            👋 Portfolio Demo
+          </p>
+          <p className="text-sm text-green-700 mb-2">
+            <span className="font-medium">admin@demo.com</span> / demo123
+          </p>
+          <button
+            onClick={handleDemoLogin}
+            disabled={loading}
+            className="w-full py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-green-300 text-sm font-medium transition-colors"
+          >
+            {loading ? 'Signing in...' : 'Try Demo Account'}
+          </button>
+        </div>
+
+        {/* Error banner */}
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
             {error}
           </div>
         )}
 
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">or sign in manually</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Email field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Email
@@ -98,7 +119,6 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password field */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password
@@ -113,15 +133,10 @@ export default function LoginPage() {
             />
           </div>
 
-          {/*
-           * Submit button
-           * Disabled while loading to prevent duplicate API calls.
-           * Text changes to give the user feedback that something is happening.
-           */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600 disabled:bg-green-300 font-medium transition-colors"
+            className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-900 disabled:bg-gray-400 font-medium transition-colors"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
