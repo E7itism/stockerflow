@@ -1,63 +1,88 @@
 /**
- * SIDEBAR - MOBILE RESPONSIVE VERSION
+ * SIDEBAR - WITH ROLE-BASED NAV FILTERING
  *
  * WHAT'S DIFFERENT:
- * - Closes automatically when link clicked (mobile)
- * - Touch-friendly button sizes
- * - Proper width for mobile overlay
- * - Close button visible on mobile
+ * - Each menu item has an optional `roles` array
+ * - Items without `roles` are visible to everyone
+ * - Items with `roles` only show if the current user's role is in that list
+ *
+ * WHY filter the sidebar AND use RoleProtectedRoute?
+ * Hiding nav links = good UX (staff don't see things they can't use)
+ * RoleProtectedRoute = actual security (blocks direct URL access)
+ * You need both — one without the other is incomplete.
  */
 
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useRole } from '../hooks/useRole';
 
 interface Props {
-  onLinkClick?: () => void; // Called when link is clicked (closes mobile menu)
+  onLinkClick?: () => void;
+}
+
+interface MenuItem {
+  path: string;
+  icon: string;
+  label: string;
+  roles?: string[]; // If defined, only these roles see this item
 }
 
 export const Sidebar: React.FC<Props> = ({ onLinkClick }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasRole } = useRole();
 
-  const isActive = (path: string) => {
-    return location.pathname === path;
+  const isActive = (path: string) => location.pathname === path;
+
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    if (onLinkClick) onLinkClick();
   };
 
   /**
-   * handleNavigation
+   * Menu items with optional role restrictions.
    *
-   * WHAT IT DOES:
-   * 1. Navigate to the page
-   * 2. Close mobile menu (if provided)
+   * No `roles` property → visible to all authenticated users
+   * Has `roles` property → only visible to users whose role is in the array
    *
-   * WHY:
-   * On mobile, clicking a link should close the sidebar
-   * On desktop, onLinkClick is still called but doesn't do anything
+   * WHY define roles here instead of in a separate config file?
+   * For a project this size, keeping it inline is simpler and easier
+   * to read — you can see exactly who sees what in one glance.
    */
-  const handleNavigation = (path: string) => {
-    navigate(path);
-    if (onLinkClick) {
-      onLinkClick(); // Close mobile menu
-    }
-  };
-
-  const menuItems = [
+  const allMenuItems: MenuItem[] = [
     { path: '/dashboard', icon: '📊', label: 'Dashboard' },
     { path: '/products', icon: '📦', label: 'Products' },
-    { path: '/categories', icon: '📁', label: 'Categories' },
-    { path: '/suppliers', icon: '🏢', label: 'Suppliers' },
     { path: '/inventory', icon: '📋', label: 'Inventory' },
-    { path: '/reports', icon: '📈', label: 'Sales Reports' },
+    {
+      path: '/categories',
+      icon: '📁',
+      label: 'Categories',
+      roles: ['admin', 'manager'],
+    },
+    {
+      path: '/suppliers',
+      icon: '🏢',
+      label: 'Suppliers',
+      roles: ['admin', 'manager'],
+    },
+    {
+      path: '/reports',
+      icon: '📈',
+      label: 'Sales Reports',
+      roles: ['admin', 'manager'],
+    },
   ];
 
+  /**
+   * Filter menu items based on current user's role.
+   *
+   * Items with no `roles` → always included
+   * Items with `roles`    → included only if user has one of those roles
+   */
+  const visibleMenuItems = allMenuItems.filter(
+    (item) => !item.roles || hasRole(...item.roles),
+  );
+
   return (
-    /**
-     * Sidebar Container
-     *
-     * RESPONSIVE:
-     * - w-64: Fixed width on all screens
-     * - Full height
-     * - Scrollable if content overflows
-     */
     <div className="w-64 bg-white shadow-lg h-full flex flex-col overflow-y-auto">
       {/* ========== MENU SECTION ========== */}
       <div className="py-6 px-4 flex-1">
@@ -66,18 +91,10 @@ export const Sidebar: React.FC<Props> = ({ onLinkClick }) => {
         </h2>
 
         <nav className="space-y-1">
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <button
               key={item.path}
               onClick={() => handleNavigation(item.path)}
-              /**
-               * Touch-Friendly Size
-               *
-               * IMPORTANT:
-               * - py-3: 12px top/bottom padding
-               * - With icon (text-2xl) = ~48px height
-               * - Meets 44px minimum touch target ✓
-               */
               className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
                 isActive(item.path)
                   ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-700'
@@ -101,29 +118,3 @@ export const Sidebar: React.FC<Props> = ({ onLinkClick }) => {
     </div>
   );
 };
-
-/**
- * =============================================================
- * MOBILE INTERACTION FLOW
- * =============================================================
- *
- * DESKTOP:
- * 1. User clicks "Products"
- * 2. handleNavigation('/products')
- * 3. navigate('/products')
- * 4. onLinkClick() (does nothing on desktop)
- * 5. Page changes
- *
- * MOBILE:
- * 1. User clicks "Products"
- * 2. handleNavigation('/products')
- * 3. navigate('/products')
- * 4. onLinkClick() → closeMobileMenu() in Layout
- * 5. Sidebar slides out
- * 6. Page changes
- *
- * RESULT:
- * Smooth mobile UX - sidebar doesn't stay open after navigation
- *
- * =============================================================
- */
