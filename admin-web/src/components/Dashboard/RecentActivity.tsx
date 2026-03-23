@@ -1,3 +1,12 @@
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  SlidersHorizontal,
+  Package,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+
 interface Transaction {
   id: number;
   product_name: string;
@@ -10,72 +19,90 @@ interface Props {
   transactions: Transaction[];
 }
 
-export const RecentActivity = ({ transactions }: Props) => {
-  const getTypeInfo = (type: string) => {
-    switch (type) {
-      case 'in':
-        return { icon: '📥', label: 'Stock In', color: 'text-green-600' };
-      case 'out':
-        return { icon: '📤', label: 'Stock Out', color: 'text-red-600' };
-      case 'adjustment':
-        return { icon: '🔧', label: 'Adjustment', color: 'text-yellow-600' };
-      default:
-        return { icon: '📦', label: 'Unknown', color: 'text-gray-600' };
-    }
-  };
+const typeConfig = {
+  in: {
+    icon: ArrowDownToLine,
+    label: 'Stock In',
+    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    quantity: 'text-emerald-600',
+    prefix: '+',
+  },
+  out: {
+    icon: ArrowUpFromLine,
+    label: 'Stock Out',
+    badge: 'bg-red-50 text-red-700 border-red-200',
+    quantity: 'text-red-600',
+    prefix: '-',
+  },
+  adjustment: {
+    icon: SlidersHorizontal,
+    label: 'Adjustment',
+    badge: 'bg-amber-50 text-amber-700 border-amber-200',
+    quantity: 'text-amber-600',
+    prefix: '',
+  },
+};
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
+const formatDate = (dateString: string) =>
+  new Date(dateString).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 
-  return (
-    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-      <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">
+export const RecentActivity = ({ transactions }: Props) => (
+  <Card>
+    <CardHeader className="pb-3">
+      <CardTitle className="text-base font-semibold text-slate-900">
         Recent Activity
-      </h2>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
       {transactions.length === 0 ? (
-        <p className="text-gray-500 text-center py-8 text-sm sm:text-base">
-          No recent activity
-        </p>
+        <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+          <Package className="w-8 h-8 mb-2 opacity-50" />
+          <p className="text-sm">No recent activity</p>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {transactions.slice(0, 5).map((transaction) => {
-            const typeInfo = getTypeInfo(transaction.transaction_type);
+        <div className="space-y-1">
+          {transactions.slice(0, 8).map((transaction) => {
+            const config =
+              typeConfig[transaction.transaction_type] ?? typeConfig.adjustment;
+            const Icon = config.icon;
             return (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between py-2 border-b last:border-0"
+                className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0"
               >
-                <div className="flex-1 min-w-0 pr-4">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-4 h-4 text-slate-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">
                     {transaction.product_name}
                   </p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-500">
-                      {typeInfo.icon} {typeInfo.label}
-                    </span>
-                    <span className="text-xs text-gray-400 hidden sm:inline">
-                      • {formatDate(transaction.created_at)}
-                    </span>
-                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {formatDate(transaction.created_at)}
+                  </p>
                 </div>
-                <div
-                  className={`text-sm font-semibold flex-shrink-0 ${typeInfo.color}`}
-                >
-                  {transaction.transaction_type === 'out' ? '-' : '+'}
-                  {transaction.quantity}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Badge
+                    variant="outline"
+                    className={`text-xs ${config.badge}`}
+                  >
+                    {config.label}
+                  </Badge>
+                  <span className={`text-sm font-bold ${config.quantity}`}>
+                    {config.prefix}
+                    {transaction.quantity}
+                  </span>
                 </div>
               </div>
             );
           })}
         </div>
       )}
-    </div>
-  );
-};
+    </CardContent>
+  </Card>
+);

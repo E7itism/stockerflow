@@ -1,3 +1,6 @@
+import { Package, FolderOpen, Truck, AlertTriangle } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+
 interface Props {
   stats: {
     total_products: number;
@@ -7,58 +10,60 @@ interface Props {
   };
 }
 
-export const OverviewCards = ({ stats }: Props) => {
-  const cards = [
-    {
-      title: 'Total Products',
-      value: stats.total_products,
-      icon: '📦',
-      color: 'bg-blue-500',
-    },
-    {
-      title: 'Categories',
-      value: stats.total_categories,
-      icon: '📁',
-      color: 'bg-green-500',
-    },
-    {
-      title: 'Suppliers',
-      value: stats.total_suppliers,
-      icon: '🏢',
-      color: 'bg-purple-500',
-    },
-    {
-      title: 'Low Stock Items',
-      value: stats.low_stock_count,
-      icon: '⚠️',
-      color: 'bg-red-500',
-    },
-  ];
+const cards = [
+  {
+    title: 'Total Products',
+    key: 'total_products' as const,
+    icon: Package,
+    color: 'text-blue-600',
+    bg: 'bg-blue-50',
+  },
+  {
+    title: 'Categories',
+    key: 'total_categories' as const,
+    icon: FolderOpen,
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-50',
+  },
+  {
+    title: 'Suppliers',
+    key: 'total_suppliers' as const,
+    icon: Truck,
+    color: 'text-violet-600',
+    bg: 'bg-violet-50',
+  },
+  {
+    title: 'Low Stock Items',
+    key: 'low_stock_count' as const,
+    icon: AlertTriangle,
+    color: 'text-red-600',
+    bg: 'bg-red-50',
+  },
+];
 
-  return (
-    <>
-      {cards.map((card, index) => (
-        <div
-          key={index}
-          className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-xs sm:text-sm font-medium uppercase">
-                {card.title}
-              </p>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-800 mt-1 sm:mt-2">
-                {card.value}
-              </p>
+export const OverviewCards = ({ stats }: Props) => (
+  <>
+    {cards.map((card) => {
+      const Icon = card.icon;
+      return (
+        <Card key={card.key} className="hover:shadow-md transition-shadow">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  {card.title}
+                </p>
+                <p className="text-3xl font-bold text-slate-900 mt-1">
+                  {stats[card.key]}
+                </p>
+              </div>
+              <div className={`${card.bg} p-3 rounded-xl flex-shrink-0`}>
+                <Icon className={`w-5 h-5 ${card.color}`} />
+              </div>
             </div>
-            <div
-              className={`${card.color} w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl flex-shrink-0`}
-            >
-              {card.icon}
-            </div>
-          </div>
-        </div>
-      ))}
-    </>
-  );
-};
+          </CardContent>
+        </Card>
+      );
+    })}
+  </>
+);

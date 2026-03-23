@@ -1,24 +1,32 @@
-/**
- * ProductsPage.tsx
- *
- * Full CRUD page for managing products.
- * Fetches products, categories, and suppliers together so the UI
- * can show names instead of raw IDs.
- *
- * ROLE-BASED BEHAVIOUR:
- * - All roles can VIEW products
- * - Admin + Manager can ADD and EDIT products
- * - Admin only can DELETE products
- *
- * Desktop: table view | Mobile: card view
- * Modal: extracted to components/Products/ProductModal.tsx
- */
-
 import { useEffect, useState } from 'react';
 import { productsAPI, categoriesAPI, suppliersAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 import { ProductModal } from '../components/Products/ProductModal';
 import { useRole } from '../hooks/useRole';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Search, Package } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export interface Product {
   id: number;
@@ -41,11 +49,27 @@ interface Category {
   id: number;
   name: string;
 }
-
 interface Supplier {
   id: number;
   name: string;
 }
+
+const getStockBadge = (stock: number, reorderLevel: number) => {
+  if (stock <= 0)
+    return {
+      label: 'Out of stock',
+      class: 'bg-red-50 text-red-700 border-red-200',
+    };
+  if (stock <= reorderLevel)
+    return {
+      label: `Low: ${stock}`,
+      class: 'bg-amber-50 text-amber-700 border-amber-200',
+    };
+  return {
+    label: String(stock),
+    class: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  };
+};
 
 export const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -56,412 +80,356 @@ export const ProductsPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
-  /**
-   * useRole gives us clean boolean flags instead of scattering
-   * user?.role === 'admin' comparisons throughout the component.
-   */
   const { canEdit, canDelete } = useRole();
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  /**
-   * fetchData — loads products, categories, and suppliers in parallel.
-   *
-   * Why Promise.all?
-   * Runs all 3 requests simultaneously instead of one after another.
-   * Faster for the user — total wait time = slowest request, not sum of all.
-   */
   const fetchData = async () => {
     try {
       setLoading(true);
       setError(null);
-
       const [productsData, categoriesData, suppliersData] = await Promise.all([
         productsAPI.getAll(),
         categoriesAPI.getAll(),
         suppliersAPI.getAll(),
       ]);
-
       const categoriesList = categoriesData.categories || categoriesData;
       const suppliersList = suppliersData.suppliers || suppliersData;
       const productsList = productsData.products || productsData;
-
-      const enrichedProducts = productsList.map((product: Product) => ({
-        ...product,
-        category_name:
-          categoriesList.find((c: Category) => c.id === product.category_id)
-            ?.name || '-',
-        supplier_name:
-          suppliersList.find((s: Supplier) => s.id === product.supplier_id)
-            ?.name || '-',
-      }));
-
-      setProducts(enrichedProducts);
+      setProducts(
+        productsList.map((product: Product) => ({
+          ...product,
+          category_name:
+            categoriesList.find((c: Category) => c.id === product.category_id)
+              ?.name || '-',
+          supplier_name:
+            suppliersList.find((s: Supplier) => s.id === product.supplier_id)
+              ?.name || '-',
+        })),
+      );
       setCategories(categoriesList);
       setSuppliers(suppliersList);
     } catch (err: any) {
-      console.error('Failed to fetch data:', err);
       setError(err.response?.data?.error || 'Failed to load products');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddProduct = () => {
-    setEditingProduct(null);
-    setShowModal(true);
-  };
-
-  const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    setShowModal(true);
-  };
-
-  const handleDeleteProduct = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this product?'))
-      return;
+  const handleDeleteConfirm = async () => {
+    if (!deleteId) return;
     try {
-      await productsAPI.delete(id);
-      setProducts(products.filter((p) => p.id !== id));
+      await productsAPI.delete(deleteId);
+      setProducts(products.filter((p) => p.id !== deleteId));
+      toast.success('Product deleted');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete product');
+      toast.error(err.response?.data?.error || 'Failed to delete product');
+    } finally {
+      setDeleteId(null);
     }
   };
 
-  const handleSaveProduct = async () => {
-    setShowModal(false);
-    await fetchData();
-  };
-
   const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.category_name?.toLowerCase().includes(searchTerm.toLowerCase()),
+    (p) =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.category_name?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
     <Layout>
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            Products
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">
-            Manage your product inventory
-          </p>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Products</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              {products.length} products in inventory
+            </p>
+          </div>
+          {canEdit && (
+            <Button
+              onClick={() => {
+                setEditingProduct(null);
+                setShowModal(true);
+              }}
+              className="bg-slate-900 hover:bg-slate-800 gap-2"
+            >
+              <Plus className="w-4 h-4" /> Add Product
+            </Button>
+          )}
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
-          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-4">
-            <div className="w-full sm:w-96">
-              <input
-                type="text"
-                placeholder="Search products..."
+        {/* Search */}
+        <Card>
+          <CardContent className="p-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Search by name, SKU or category..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                className="pl-9 h-10"
               />
             </div>
+          </CardContent>
+        </Card>
 
-            {/**
-             * Add Product button — only shown to admin and manager.
-             * Staff can browse products but not add new ones.
-             */}
-            {canEdit && (
-              <button
-                onClick={handleAddProduct}
-                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium text-base"
-              >
-                + Add Product
-              </button>
-            )}
-          </div>
-        </div>
-
+        {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <div className="flex items-center justify-center py-24">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
           </div>
         ) : error ? (
-          <div className="bg-red-50 text-red-600 p-4 rounded-lg">{error}</div>
+          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={fetchData}>
+              Retry
+            </Button>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <Package className="w-10 h-10 mb-3 opacity-40" />
+              <p className="font-medium">No products found</p>
+              <p className="text-sm mt-1">
+                {searchTerm
+                  ? `No results for "${searchTerm}"`
+                  : 'Add your first product to get started'}
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           <>
-            {/* Desktop: table view */}
+            {/* Desktop table */}
             <div className="hidden md:block">
-              <ProductsTable
-                products={filteredProducts}
-                onEdit={handleEditProduct}
-                onDelete={handleDeleteProduct}
-                canEdit={canEdit}
-                canDelete={canDelete}
-              />
+              <Card className="overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="text-xs uppercase tracking-wider">
+                        SKU
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">
+                        Name
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">
+                        Category
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">
+                        Unit
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider text-right">
+                        Price
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider text-center">
+                        Stock
+                      </TableHead>
+                      {(canEdit || canDelete) && (
+                        <TableHead className="text-xs uppercase tracking-wider text-center">
+                          Actions
+                        </TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProducts.map((product) => {
+                      const stock = getStockBadge(
+                        product.current_stock || 0,
+                        product.reorder_level,
+                      );
+                      return (
+                        <TableRow
+                          key={product.id}
+                          className="hover:bg-slate-50"
+                        >
+                          <TableCell className="text-xs font-mono text-slate-500">
+                            {product.sku}
+                          </TableCell>
+                          <TableCell className="font-medium text-slate-900">
+                            {product.name}
+                          </TableCell>
+                          <TableCell className="text-slate-600 text-sm">
+                            {product.category_name || '-'}
+                          </TableCell>
+                          <TableCell className="text-slate-600 text-sm capitalize">
+                            {product.unit_of_measure}
+                          </TableCell>
+                          <TableCell className="text-right font-medium text-slate-900">
+                            ₱{Number(product.unit_price).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${stock.class}`}
+                            >
+                              {stock.label}
+                            </Badge>
+                          </TableCell>
+                          {(canEdit || canDelete) && (
+                            <TableCell className="text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                {canEdit && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingProduct(product);
+                                      setShowModal(true);
+                                    }}
+                                    className="h-7 px-2.5 text-xs"
+                                  >
+                                    Edit
+                                  </Button>
+                                )}
+                                {canDelete && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setDeleteId(product.id)}
+                                    className="h-7 px-2.5 text-xs text-red-600 hover:text-red-700 hover:border-red-200 hover:bg-red-50"
+                                  >
+                                    Delete
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
             </div>
 
-            {/* Mobile: card view */}
-            <div className="md:hidden">
-              <ProductsCards
-                products={filteredProducts}
-                onEdit={handleEditProduct}
-                onDelete={handleDeleteProduct}
-                canEdit={canEdit}
-                canDelete={canDelete}
-              />
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-3">
+              {filteredProducts.map((product) => {
+                const stock = getStockBadge(
+                  product.current_stock || 0,
+                  product.reorder_level,
+                );
+                return (
+                  <Card key={product.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="font-semibold text-slate-900">
+                            {product.name}
+                          </h3>
+                          <p className="text-xs font-mono text-slate-400 mt-0.5">
+                            {product.sku}
+                          </p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-xs ${stock.class}`}
+                        >
+                          {stock.label}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+                        <div>
+                          <p className="text-xs text-slate-400">Category</p>
+                          <p className="font-medium text-slate-700">
+                            {product.category_name || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-400">Supplier</p>
+                          <p className="font-medium text-slate-700">
+                            {product.supplier_name || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-400">Price</p>
+                          <p className="font-medium text-slate-700">
+                            ₱{Number(product.unit_price).toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-400">Unit</p>
+                          <p className="font-medium text-slate-700 capitalize">
+                            {product.unit_of_measure}
+                          </p>
+                        </div>
+                      </div>
+                      {(canEdit || canDelete) && (
+                        <div className="flex gap-2">
+                          {canEdit && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingProduct(product);
+                                setShowModal(true);
+                              }}
+                              className="flex-1"
+                            >
+                              Edit
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDeleteId(product.id)}
+                              className="flex-1 text-red-600 hover:text-red-700 hover:border-red-200 hover:bg-red-50"
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </>
         )}
 
+        {/* Product modal */}
         {showModal && (
           <ProductModal
             product={editingProduct}
             categories={categories}
             suppliers={suppliers}
             onClose={() => setShowModal(false)}
-            onSave={handleSaveProduct}
+            onSave={() => {
+              setShowModal(false);
+              fetchData();
+            }}
           />
         )}
+
+        {/* Delete confirmation */}
+        <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Product</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this product? This action cannot
+                be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
-  );
-};
-
-// ─────────────────────────────────────────────
-// TABLE (Desktop)
-// ─────────────────────────────────────────────
-
-interface TableProps {
-  products: Product[];
-  onEdit: (product: Product) => void;
-  onDelete: (id: number) => void;
-  canEdit: boolean;
-  canDelete: boolean;
-}
-
-const ProductsTable: React.FC<TableProps> = ({
-  products,
-  onEdit,
-  onDelete,
-  canEdit,
-  canDelete,
-}) => {
-  const getStockColor = (stock: number, reorderLevel: number) => {
-    if (stock <= 0) return 'text-red-600 bg-red-50';
-    if (stock <= reorderLevel) return 'text-yellow-600 bg-yellow-50';
-    return 'text-green-600 bg-green-50';
-  };
-
-  if (products.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-16 text-center">
-        <p className="text-gray-500 text-lg">No products found</p>
-        <p className="text-gray-400 text-sm mt-2">
-          Add your first product to get started
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                SKU
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Category
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                Unit
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                Price
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                Stock
-              </th>
-              {/**
-               * Only render the Actions column header if the user
-               * can do at least one action. Avoids an empty column for staff.
-               */}
-              {(canEdit || canDelete) && (
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                  Actions
-                </th>
-              )}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {products.map((product) => (
-              <tr key={product.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {product.sku}
-                </td>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                  {product.name}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {product.category_name || '-'}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {product.unit_of_measure}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900 text-right">
-                  ₱{Number(product.unit_price).toFixed(2)}
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span
-                    className={`inline-block px-2 py-1 text-xs font-semibold rounded ${getStockColor(product.current_stock || 0, product.reorder_level)}`}
-                  >
-                    {product.current_stock || 0}
-                  </span>
-                </td>
-
-                {(canEdit || canDelete) && (
-                  <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      {/**
-                       * Edit — admin and manager
-                       * Conditionally rendered, not just disabled,
-                       * so staff see a clean table with no dead buttons.
-                       */}
-                      {canEdit && (
-                        <button
-                          onClick={() => onEdit(product)}
-                          className="px-3 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 text-sm font-medium"
-                        >
-                          Edit
-                        </button>
-                      )}
-
-                      {/**
-                       * Delete — admin only
-                       * Most destructive action, highest restriction.
-                       */}
-                      {canDelete && (
-                        <button
-                          onClick={() => onDelete(product.id)}
-                          className="px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm font-medium"
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
-
-// ─────────────────────────────────────────────
-// CARDS (Mobile)
-// ─────────────────────────────────────────────
-
-const ProductsCards: React.FC<TableProps> = ({
-  products,
-  onEdit,
-  onDelete,
-  canEdit,
-  canDelete,
-}) => {
-  const getStockColor = (stock: number, reorderLevel: number) => {
-    if (stock <= 0) return 'bg-red-500';
-    if (stock <= reorderLevel) return 'bg-yellow-500';
-    return 'bg-green-500';
-  };
-
-  if (products.length === 0) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-8 text-center">
-        <p className="text-gray-500 text-lg">No products found</p>
-        <p className="text-gray-400 text-sm mt-2">
-          Add your first product to get started
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {products.map((product) => (
-        <div key={product.id} className="bg-white rounded-lg shadow-md p-4">
-          <div className="flex justify-between items-start mb-3">
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {product.name}
-              </h3>
-              <p className="text-sm text-gray-500">SKU: {product.sku}</p>
-            </div>
-            <span
-              className={`px-2 py-1 rounded text-xs font-semibold text-white ${getStockColor(product.current_stock || 0, product.reorder_level)}`}
-            >
-              {product.current_stock || 0}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-            <div>
-              <span className="text-gray-500">Category:</span>
-              <p className="text-gray-900 font-medium">
-                {product.category_name || '-'}
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-500">Supplier:</span>
-              <p className="text-gray-900 font-medium">
-                {product.supplier_name || '-'}
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-500">Price:</span>
-              <p className="text-gray-900 font-medium">
-                ₱{Number(product.unit_price).toFixed(2)}
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-500">Unit:</span>
-              <p className="text-gray-900 font-medium">
-                {product.unit_of_measure}
-              </p>
-            </div>
-          </div>
-
-          {/* Only show action buttons if the user has at least one permission */}
-          {(canEdit || canDelete) && (
-            <div className="flex gap-2">
-              {canEdit && (
-                <button
-                  onClick={() => onEdit(product)}
-                  className="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium text-sm"
-                >
-                  Edit
-                </button>
-              )}
-              {canDelete && (
-                <button
-                  onClick={() => onDelete(product.id)}
-                  className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium text-sm"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
   );
 };
