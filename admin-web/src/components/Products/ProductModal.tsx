@@ -1,26 +1,19 @@
-/**
- * ProductModal.tsx
- *
- * Reusable modal for creating and editing products.
- * Used by ProductsPage for both Add and Edit flows.
- *
- * Props:
- *   product    — null = create mode, Product = edit mode
- *   categories — list for the category dropdown
- *   suppliers  — list for the supplier dropdown
- *   onClose    — called when modal is dismissed
- *   onSave     — called after successful save (triggers list refresh)
- */
-
 import { useState } from 'react';
 import { productsAPI } from '../../services/api';
 import type { Product } from '../../pages/ProductsPage';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface Category {
   id: number;
   name: string;
 }
-
 interface Supplier {
   id: number;
   name: string;
@@ -51,7 +44,6 @@ export const ProductModal: React.FC<Props> = ({
     reorder_level: product?.reorder_level || 10,
     unit_of_measure: product?.unit_of_measure || 'piece',
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -75,12 +67,10 @@ export const ProductModal: React.FC<Props> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
     if (formData.category_id === 0) {
       setError('Please select a category');
       return;
     }
-
     if (formData.supplier_id === 0) {
       setError('Please select a supplier');
       return;
@@ -91,14 +81,12 @@ export const ProductModal: React.FC<Props> = ({
       unit_price: parseFloat(String(formData.unit_price)) || 0,
       reorder_level: parseInt(String(formData.reorder_level)) || 0,
     };
-
     if (submitData.unit_price <= 0) {
       setError('Unit price must be greater than 0');
       return;
     }
 
     setLoading(true);
-
     try {
       if (product) {
         await productsAPI.update(product.id, submitData);
@@ -112,184 +100,194 @@ export const ProductModal: React.FC<Props> = ({
     }
   };
 
+  const fieldClass =
+    'w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none';
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-lg sm:rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-4 sm:p-6">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
             {product ? 'Edit Product' : 'Add New Product'}
-          </h2>
+          </DialogTitle>
+        </DialogHeader>
 
-          {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                SKU *
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-700">SKU *</label>
+            <Input
+              name="sku"
+              value={formData.sku}
+              onChange={handleChange}
+              placeholder="e.g., PROD-001"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-700">
+              Product Name *
+            </label>
+            <Input
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder="e.g., Coca-Cola 1.5L"
+              required
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-700">
+              Description
+            </label>
+            <textarea
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows={2}
+              className={fieldClass}
+              placeholder="Optional description..."
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-700">
+              Category *
+            </label>
+            <select
+              name="category_id"
+              value={formData.category_id}
+              onChange={handleChange}
+              className={fieldClass}
+              required
+            >
+              <option value={0}>Select category...</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-700">
+              Supplier *
+            </label>
+            <select
+              name="supplier_id"
+              value={formData.supplier_id}
+              onChange={handleChange}
+              className={fieldClass}
+              required
+            >
+              <option value={0}>Select supplier...</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">
+                Unit Price *
               </label>
-              <input
-                type="text"
-                name="sku"
-                value={formData.sku}
+              <Input
+                type="number"
+                name="unit_price"
+                value={formData.unit_price}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="e.g., PROD-001"
+                onFocus={(e) => e.target.select()}
+                step="0.01"
+                min="0"
+                placeholder="0.00"
                 required
               />
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Name *
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-slate-700">
+                Reorder Level *
               </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
+              <Input
+                type="number"
+                name="reorder_level"
+                value={formData.reorder_level}
                 onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="e.g., Coca-Cola 1.5L"
+                onFocus={(e) => e.target.select()}
+                min="0"
+                placeholder="10"
                 required
               />
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                rows={3}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                placeholder="Optional description..."
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-slate-700">
+              Unit of Measure *
+            </label>
+            <select
+              name="unit_of_measure"
+              value={formData.unit_of_measure}
+              onChange={handleChange}
+              className={fieldClass}
+            >
+              {[
+                'piece',
+                'sachet',
+                'pack',
+                'bottle',
+                'can',
+                'kilo',
+                'gram',
+                'tray',
+                'dozen',
+                'liter',
+              ].map((u) => (
+                <option key={u} value={u} className="capitalize">
+                  {u.charAt(0).toUpperCase() + u.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category *
-              </label>
-              <select
-                name="category_id"
-                value={formData.category_id}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                required
-              >
-                <option value={0}>Select category...</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Supplier *
-              </label>
-              <select
-                name="supplier_id"
-                value={formData.supplier_id}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                required
-              >
-                <option value={0}>Select supplier...</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit Price *
-                </label>
-                <input
-                  type="number"
-                  name="unit_price"
-                  value={formData.unit_price}
-                  onChange={handleChange}
-                  onFocus={(e) => e.target.select()}
-                  step="0.01"
-                  min="0"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Reorder Level *
-                </label>
-                <input
-                  type="number"
-                  name="reorder_level"
-                  value={formData.reorder_level}
-                  onChange={handleChange}
-                  onFocus={(e) => e.target.select()}
-                  min="0"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                  placeholder="10"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Unit of Measure *
-              </label>
-              <select
-                name="unit_of_measure"
-                value={formData.unit_of_measure}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-              >
-                <option value="piece">Piece</option>
-                <option value="sachet">Sachet</option>
-                <option value="pack">Pack</option>
-                <option value="bottle">Bottle</option>
-                <option value="can">Can</option>
-                <option value="kilo">Kilo</option>
-                <option value="gram">Gram</option>
-                <option value="tray">Tray</option>
-                <option value="dozen">Dozen</option>
-                <option value="liter">Liter</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 mt-6 pt-6 border-t">
-              <button
-                type="button"
-                onClick={onClose}
-                className="w-full sm:w-auto px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full sm:w-auto px-6 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 font-medium"
-              >
-                {loading ? 'Saving...' : product ? 'Update' : 'Add Product'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-slate-900 hover:bg-slate-800"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Saving...
+                </span>
+              ) : product ? (
+                'Update Product'
+              ) : (
+                'Add Product'
+              )}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };

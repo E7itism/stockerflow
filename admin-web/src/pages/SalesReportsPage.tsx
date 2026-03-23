@@ -1,49 +1,37 @@
-/**
- * SalesReportsPage.tsx
- *
- * Admin view for sales analytics.
- *
- * WHAT THIS PAGE SHOWS:
- * 1. Summary cards — total revenue, # of transactions, avg sale value
- * 2. Top 5 selling products (by units sold)
- * 3. Paginated sales list — each row expandable to show line items
- * 4. Date range filter — preset shortcuts + custom date inputs
- * 5. CSV export — downloads all sales + line items for the current date range
- *
- * DATA FLOW:
- * - On mount → fetch summary + sales list for default range (last 30 days)
- * - User picks date range → refetch both
- * - User clicks a sale row → lazy-fetch that sale's line items
- * - User paginates → fetch next page of sales (summary stays the same)
- *
- * WHY split summary and sales list into separate fetches?
- * The summary (totals, top products) only changes when the DATE changes.
- * The sales list also changes on PAGE change. Keeping them separate
- * means pagination doesn't re-run the heavy aggregation queries.
- */
-
 import { useState, useEffect, useCallback } from 'react';
 import { Layout } from '../components/Layout';
+import { reportsAPI } from '../services/api';
+import type { ReportSummary, SaleRecord, SaleItem } from '../services/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
-  reportsAPI,
-  ReportSummary,
-  SaleRecord,
-  SaleItem,
-} from '../services/api';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DollarSign,
+  Receipt,
+  TrendingUp,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  BarChart3,
+  User,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // HELPERS
-// ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 
-/**
- * Format as Philippine Peso — matches the ₱ pattern used in ProductsPage.
- * Using toFixed(2) to stay consistent with the rest of the app.
- */
 const formatPeso = (value: number | string): string =>
   `₱${Number(value).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** Format an ISO timestamp as a readable local date + time. */
 const formatDateTime = (iso: string): string =>
   new Intl.DateTimeFormat('en-PH', {
     year: 'numeric',
@@ -53,142 +41,88 @@ const formatDateTime = (iso: string): string =>
     minute: '2-digit',
   }).format(new Date(iso));
 
-/** Returns YYYY-MM-DD string for a Date (used to seed date inputs). */
+const formatDateShort = (iso: string): string =>
+  new Intl.DateTimeFormat('en-PH', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
+
 const toDateInput = (d: Date): string => d.toISOString().split('T')[0];
 
-// ─────────────────────────────────────────────────────────────────
-// CSV EXPORT HELPERS
-// ─────────────────────────────────────────────────────────────────
-
-/**
- * Escapes a single CSV cell value.
- *
- * WHY wrap in quotes and escape inner quotes?
- * CSV cells containing commas, newlines, or quote characters must be
- * wrapped in double quotes. Any existing double quotes inside the value
- * are escaped by doubling them — "" is the CSV standard for a literal ".
- * Without this, a product name like `Coca-Cola, 1.5L` would break columns.
- */
 const escapeCsvCell = (value: string | number): string => {
   const str = String(value);
-  if (/[",\n\r]/.test(str)) {
-    return `"${str.replace(/"/g, '""')}"`;
-  }
+  if (/[",\n\r]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
   return str;
 };
 
-/** Converts a 2D array of values into a CSV string. */
 const buildCsv = (rows: (string | number)[][]): string =>
   rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n');
 
-/**
- * Triggers a browser file download for the given CSV string.
- *
- * HOW IT WORKS:
- * 1. Create a Blob from the CSV text
- * 2. Generate a temporary object URL pointing to that blob
- * 3. Create a hidden <a> tag, set href + download attribute, click it
- * 4. Clean up the object URL immediately (prevents memory leaks)
- *
- * WHY client-side instead of a backend download endpoint?
- * The data is already in the browser — sending it to the server just to
- * get it back as a file is wasteful. Client-side is instant and works offline.
- *
- * WHY the BOM prefix?
- * The UTF-8 BOM (\uFEFF) tells Excel to correctly detect UTF-8 encoding.
- * Without it, the ₱ symbol and other special characters render as garbled text.
- */
 const downloadCsv = (csvString: string, filename: string): void => {
-  const bom = '\uFEFF';
-  const blob = new Blob([bom + csvString], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csvString], {
+    type: 'text/csv;charset=utf-8;',
+  });
   const url = URL.createObjectURL(blob);
-
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
   link.style.display = 'none';
-
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-
-  // Free the object URL — no longer needed after the click
   URL.revokeObjectURL(url);
 };
 
-// ─────────────────────────────────────────────────────────────────
-// DATE PRESET SHORTCUTS
-// ─────────────────────────────────────────────────────────────────
-
 type Preset = 'today' | 'week' | 'month' | 'custom';
 
-/**
- * Calculates the from/to pair for each preset.
- * "today" uses today's date for both — the backend's inclusive range
- * handles covering the full day.
- */
 const getPresetRange = (preset: Preset): { from: string; to: string } => {
   const today = new Date();
   const to = toDateInput(today);
-
   if (preset === 'today') return { from: to, to };
-
   if (preset === 'week') {
     const from = new Date(today);
-    from.setDate(today.getDate() - 6); // last 7 days including today
+    from.setDate(today.getDate() - 6);
     return { from: toDateInput(from), to };
   }
-
   if (preset === 'month') {
     const from = new Date(today);
-    from.setDate(today.getDate() - 29); // last 30 days including today
+    from.setDate(today.getDate() - 29);
     return { from: toDateInput(from), to };
   }
-
   return { from: toDateInput(today), to };
 };
 
-// ─────────────────────────────────────────────────────────────────
+const medals = ['🥇', '🥈', '🥉'];
+
+const inputClass =
+  'border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none w-full';
+
+// ─────────────────────────────────────────────
 // COMPONENT
-// ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────
 
 export const SalesReportsPage: React.FC = () => {
-  // ── Date filter state ──────────────────────────────────────────
   const [preset, setPreset] = useState<Preset>('month');
-  const [dateFrom, setDateFrom] = useState<string>(
-    () => getPresetRange('month').from,
-  );
-  const [dateTo, setDateTo] = useState<string>(
-    () => getPresetRange('month').to,
-  );
+  const [dateFrom, setDateFrom] = useState(() => getPresetRange('month').from);
+  const [dateTo, setDateTo] = useState(() => getPresetRange('month').to);
 
-  // ── Summary data ───────────────────────────────────────────────
   const [summary, setSummary] = useState<ReportSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
 
-  // ── Sales list data ────────────────────────────────────────────
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [salesLoading, setSalesLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalSales, setTotalSales] = useState(0);
 
-  // ── Expanded row state ─────────────────────────────────────────
-  // Maps sale_id → its line items (loaded lazily on expand)
   const [expandedSaleId, setExpandedSaleId] = useState<number | null>(null);
   const [expandedItems, setExpandedItems] = useState<
     Record<number, SaleItem[]>
   >({});
   const [itemsLoading, setItemsLoading] = useState(false);
-
-  // ── Export state ───────────────────────────────────────────────
-  // Separate loading flag so the export button shows a spinner
-  // without affecting the rest of the page
   const [exportLoading, setExportLoading] = useState(false);
-
-  // ─────────────────────────────────────────────────────────────
-  // DATA FETCHING
-  // ─────────────────────────────────────────────────────────────
 
   const fetchSummary = useCallback(async () => {
     setSummaryLoading(true);
@@ -222,7 +156,6 @@ export const SalesReportsPage: React.FC = () => {
     [dateFrom, dateTo],
   );
 
-  // Refetch both when date range changes
   useEffect(() => {
     setCurrentPage(1);
     setExpandedSaleId(null);
@@ -230,27 +163,13 @@ export const SalesReportsPage: React.FC = () => {
     fetchSales(1);
   }, [fetchSummary, fetchSales]);
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    setExpandedSaleId(null);
-    fetchSales(page);
-  };
-
-  // ─────────────────────────────────────────────────────────────
-  // ROW EXPAND / COLLAPSE
-  // ─────────────────────────────────────────────────────────────
-
   const handleRowClick = async (saleId: number) => {
     if (expandedSaleId === saleId) {
       setExpandedSaleId(null);
       return;
     }
-
     setExpandedSaleId(saleId);
-
-    // Skip API call if we already loaded this sale's items
     if (expandedItems[saleId]) return;
-
     setItemsLoading(true);
     try {
       const items = await reportsAPI.getSaleItems(saleId);
@@ -262,10 +181,6 @@ export const SalesReportsPage: React.FC = () => {
     }
   };
 
-  // ─────────────────────────────────────────────────────────────
-  // DATE PRESET HANDLERS
-  // ─────────────────────────────────────────────────────────────
-
   const handlePreset = (p: Preset) => {
     setPreset(p);
     if (p !== 'custom') {
@@ -275,59 +190,21 @@ export const SalesReportsPage: React.FC = () => {
     }
   };
 
-  const handleCustomFrom = (val: string) => {
-    setPreset('custom');
-    setDateFrom(val);
-  };
-
-  const handleCustomTo = (val: string) => {
-    setPreset('custom');
-    setDateTo(val);
-  };
-
-  // ─────────────────────────────────────────────────────────────
-  // CSV EXPORT
-  // ─────────────────────────────────────────────────────────────
-
-  /**
-   * handleExport — fetches ALL sales for the current date range,
-   * then fetches line items for each sale, and builds a flat CSV.
-   *
-   * WHY fetch all sales with limit=9999 instead of reusing `sales` state?
-   * The table is paginated — `sales` only holds the current page (20 rows).
-   * The export should include every transaction in the date range, not just
-   * what's visible on screen.
-   *
-   * CSV STRUCTURE (flat — one row per line item):
-   * Sale ID | Date | Cashier | Payment | Product | Qty | Unit Price | Subtotal | Sale Total
-   *
-   * WHY flatten into one row per line item instead of one row per sale?
-   * A flat structure opens correctly in Excel without any pivoting needed.
-   * The sale-level fields (ID, date, cashier) repeat on each item row —
-   * this is the standard format for transaction exports.
-   */
   const handleExport = async () => {
     setExportLoading(true);
     try {
-      // Step 1: Fetch all sales for the date range (no pagination)
       const allSalesData = await reportsAPI.getSales(
         { from: dateFrom, to: dateTo },
         1,
-        9999, // high limit to get everything in one request
+        9999,
       );
-
       if (allSalesData.sales.length === 0) {
-        toast.error('No sales to export for this date range');
+        toast.error('No sales to export');
         return;
       }
-
-      // Step 2: Fetch line items for every sale in parallel
-      // Promise.all runs all requests simultaneously — much faster than sequential awaits
       const itemsPerSale = await Promise.all(
         allSalesData.sales.map((sale) => reportsAPI.getSaleItems(sale.id)),
       );
-
-      // Step 3: Build the CSV rows — one row per line item
       const headers = [
         'Sale ID',
         'Date',
@@ -340,12 +217,9 @@ export const SalesReportsPage: React.FC = () => {
         'Subtotal (₱)',
         'Sale Total (₱)',
       ];
-
-      const dataRows = allSalesData.sales.flatMap((sale, saleIndex) => {
-        const items = itemsPerSale[saleIndex];
-
-        // If a sale somehow has no items, still include a row for it
-        if (items.length === 0) {
+      const dataRows = allSalesData.sales.flatMap((sale, i) => {
+        const items = itemsPerSale[i];
+        if (items.length === 0)
           return [
             [
               sale.id,
@@ -360,8 +234,6 @@ export const SalesReportsPage: React.FC = () => {
               Number(sale.total_amount).toFixed(2),
             ],
           ];
-        }
-
         return items.map((item) => [
           sale.id,
           formatDateTime(sale.created_at),
@@ -375,13 +247,10 @@ export const SalesReportsPage: React.FC = () => {
           Number(sale.total_amount).toFixed(2),
         ]);
       });
-
-      const csv = buildCsv([headers, ...dataRows]);
-
-      // Filename includes the date range so exported files are easy to identify
-      const filename = `sales-report_${dateFrom}_to_${dateTo}.csv`;
-      downloadCsv(csv, filename);
-
+      downloadCsv(
+        buildCsv([headers, ...dataRows]),
+        `sales-report_${dateFrom}_to_${dateTo}.csv`,
+      );
       toast.success(`Exported ${allSalesData.sales.length} transactions`);
     } catch {
       toast.error('Failed to export CSV');
@@ -393,416 +262,506 @@ export const SalesReportsPage: React.FC = () => {
   if (summaryLoading && !summary) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500"></div>
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900" />
         </div>
       </Layout>
     );
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────
-
   return (
     <Layout>
-      <div className="p-4 sm:p-6 lg:p-8">
-        {/* ── Page Header ──────────────────────────────────────── */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            Sales Reports
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">
-            Track revenue, transaction volume, and top-selling products.
-          </p>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* ── Header ──────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Sales Reports</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Track revenue, transactions, and top products.
+            </p>
+          </div>
+          <Button
+            onClick={handleExport}
+            disabled={exportLoading}
+            variant="outline"
+            size="sm"
+            className="gap-2 flex-shrink-0"
+          >
+            {exportLoading ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-400 border-t-transparent" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">Export CSV</span>
+          </Button>
         </div>
 
-        {/* ── Date Filter ──────────────────────────────────────── */}
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Preset shortcut buttons */}
-            <div className="flex gap-2">
+        {/* ── Date filter ─────────────────────────────── */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            {/* Preset buttons */}
+            <div className="flex gap-2 flex-wrap">
               {(['today', 'week', 'month'] as const).map((p) => (
-                <button
+                <Button
                   key={p}
+                  size="sm"
+                  variant={preset === p ? 'default' : 'outline'}
                   onClick={() => handlePreset(p)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    preset === p
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                  className={
+                    preset === p ? 'bg-slate-900 hover:bg-slate-800' : ''
+                  }
                 >
                   {p === 'today'
                     ? 'Today'
                     : p === 'week'
                       ? 'This Week'
                       : 'This Month'}
-                </button>
+                </Button>
               ))}
             </div>
 
-            {/* Divider */}
-            <span className="hidden sm:block text-gray-300">|</span>
-
-            {/* Custom date inputs */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <label className="text-sm text-gray-500">From</label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => handleCustomFrom(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <label className="text-sm text-gray-500">To</label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => handleCustomTo(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+            {/* Date inputs — full width, stacked on mobile */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500">
+                  From
+                </label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => {
+                    setPreset('custom');
+                    setDateFrom(e.target.value);
+                  }}
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-500">To</label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => {
+                    setPreset('custom');
+                    setDateTo(e.target.value);
+                  }}
+                  className={inputClass}
+                />
+              </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Export button — sits at the end of the filter bar */}
-            <div className="sm:ml-auto">
-              <button
-                onClick={handleExport}
-                disabled={exportLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+        {/* ── Summary cards ───────────────────────────── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[
+            {
+              label: 'Total Revenue',
+              value: formatPeso(summary?.summary.total_revenue || 0),
+              icon: DollarSign,
+              color: 'text-emerald-600',
+              bg: 'bg-emerald-50',
+            },
+            {
+              label: 'Total Transactions',
+              value: (summary?.summary.transaction_count || 0).toLocaleString(),
+              icon: Receipt,
+              color: 'text-blue-600',
+              bg: 'bg-blue-50',
+            },
+            {
+              label: 'Avg. Transaction',
+              value: formatPeso(summary?.summary.avg_transaction_value || 0),
+              icon: TrendingUp,
+              color: 'text-violet-600',
+              bg: 'bg-violet-50',
+            },
+          ].map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card
+                key={card.label}
+                className="hover:shadow-md transition-shadow"
               >
-                {exportLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                    Exporting...
-                  </>
-                ) : (
-                  <>⬇️ Export CSV</>
-                )}
-              </button>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                        {card.label}
+                      </p>
+                      {summaryLoading ? (
+                        <div className="h-7 bg-slate-200 rounded animate-pulse w-28 mt-1" />
+                      ) : (
+                        <p className="text-2xl font-bold text-slate-900 mt-1">
+                          {card.value}
+                        </p>
+                      )}
+                    </div>
+                    <div className={`${card.bg} p-3 rounded-xl flex-shrink-0`}>
+                      <Icon className={`w-5 h-5 ${card.color}`} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* ── Top products — full width ────────────────── */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold text-slate-900">
+                Top Selling Products
+              </CardTitle>
+              <BarChart3 className="w-4 h-4 text-slate-400" />
             </div>
-          </div>
-        </div>
-
-        {/* ── Summary Cards ─────────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <SummaryCard
-            label="Total Revenue"
-            value={formatPeso(summary?.summary.total_revenue || 0)}
-            icon="💰"
-            loading={summaryLoading}
-          />
-          <SummaryCard
-            label="Total Transactions"
-            value={(summary?.summary.transaction_count || 0).toLocaleString()}
-            icon="🧾"
-            loading={summaryLoading}
-          />
-          <SummaryCard
-            label="Avg. Transaction"
-            value={formatPeso(summary?.summary.avg_transaction_value || 0)}
-            icon="📊"
-            loading={summaryLoading}
-          />
-        </div>
-
-        {/* ── Top Products + Sales List ─────────────────────────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 sm:gap-8">
-          {/* ── Top 5 Products ───────────────────────────────────── */}
-          <div className="xl:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 h-full">
-              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-4">
-                🏆 Top Selling Products
-              </h2>
-
-              {summaryLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                </div>
-              ) : summary && summary.top_products.length > 0 ? (
-                <div className="space-y-4">
-                  {summary.top_products.map((product, index) => {
-                    const maxQty = summary.top_products[0].total_quantity;
-                    const barWidth = Math.round(
-                      (product.total_quantity / maxQty) * 100,
-                    );
-
-                    return (
-                      <div key={product.product_name}>
-                        <div className="flex justify-between items-baseline mb-1">
-                          <span className="text-sm text-gray-900 font-medium flex items-center gap-1.5 truncate pr-2">
-                            <span>
-                              {index === 0
-                                ? '🥇'
-                                : index === 1
-                                  ? '🥈'
-                                  : index === 2
-                                    ? '🥉'
-                                    : `${index + 1}.`}
-                            </span>
-                            <span className="truncate">
-                              {product.product_name}
-                            </span>
-                          </span>
-                          <span className="text-xs text-gray-500 whitespace-nowrap">
-                            {product.total_quantity.toLocaleString()} units
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-1.5">
-                          <div
-                            className="bg-blue-500 h-1.5 rounded-full"
-                            style={{ width: `${barWidth}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-400 mt-0.5 text-right">
-                          {formatPeso(product.total_revenue)}
+          </CardHeader>
+          <CardContent>
+            {summaryLoading ? (
+              <div className="flex items-center justify-center py-6">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-slate-900" />
+              </div>
+            ) : summary && summary.top_products.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                {summary.top_products.map((product, index) => {
+                  const maxQty = summary.top_products[0].total_quantity;
+                  const barWidth = Math.round(
+                    (product.total_quantity / maxQty) * 100,
+                  );
+                  return (
+                    <div key={product.product_name} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg flex-shrink-0">
+                          {medals[index] ?? `${index + 1}.`}
+                        </span>
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          {product.product_name}
                         </p>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 text-lg">
-                    No sales in this period
-                  </p>
-                  <p className="text-gray-400 text-sm mt-2">
-                    Try a wider date range
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ── Sales List ───────────────────────────────────────── */}
-          <div className="xl:col-span-2">
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              {/* Table header bar */}
-              <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
-                <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  🧾 Transactions
-                </h2>
-                {!salesLoading && (
-                  <span className="text-xs text-gray-400">
-                    {totalSales.toLocaleString()} total
-                  </span>
-                )}
-              </div>
-
-              {salesLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                </div>
-              ) : sales.length === 0 ? (
-                <div className="p-16 text-center">
-                  <p className="text-gray-500 text-lg">No transactions found</p>
-                  <p className="text-gray-400 text-sm mt-2">
-                    Try adjusting your date range
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Date & Time
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Cashier
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                            Amount
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Method
-                          </th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                            Details
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {sales.map((sale) => (
-                          <>
-                            {/* Main sale row */}
-                            <tr
-                              key={sale.id}
-                              onClick={() => handleRowClick(sale.id)}
-                              className={`cursor-pointer hover:bg-gray-50 transition-colors ${
-                                expandedSaleId === sale.id ? 'bg-blue-50' : ''
-                              }`}
-                            >
-                              <td className="px-6 py-4 text-sm text-gray-600">
-                                {formatDateTime(sale.created_at)}
-                              </td>
-                              <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                                {sale.cashier_name}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-900 text-right font-semibold">
-                                {formatPeso(sale.total_amount)}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-600 capitalize">
-                                {sale.payment_method}
-                              </td>
-                              <td className="px-6 py-4 text-center text-xs text-gray-400">
-                                {expandedSaleId === sale.id
-                                  ? '▲ hide'
-                                  : '▼ view'}
-                              </td>
-                            </tr>
-
-                            {/* Expanded line items */}
-                            {expandedSaleId === sale.id && (
-                              <tr key={`${sale.id}-items`}>
-                                <td
-                                  colSpan={5}
-                                  className="px-6 pb-4 pt-0 bg-blue-50"
-                                >
-                                  {itemsLoading && !expandedItems[sale.id] ? (
-                                    <div className="flex items-center justify-center py-4">
-                                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                                    </div>
-                                  ) : (
-                                    <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-blue-100">
-                                      <table className="w-full">
-                                        <thead className="bg-blue-50 border-b border-blue-100">
-                                          <tr>
-                                            <th className="px-4 py-2 text-left text-xs font-medium text-blue-600 uppercase">
-                                              Product
-                                            </th>
-                                            <th className="px-4 py-2 text-right text-xs font-medium text-blue-600 uppercase">
-                                              Qty
-                                            </th>
-                                            <th className="px-4 py-2 text-right text-xs font-medium text-blue-600 uppercase">
-                                              Unit Price
-                                            </th>
-                                            <th className="px-4 py-2 text-right text-xs font-medium text-blue-600 uppercase">
-                                              Subtotal
-                                            </th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                          {(expandedItems[sale.id] || []).map(
-                                            (item, idx) => (
-                                              <tr
-                                                key={idx}
-                                                className="hover:bg-gray-50"
-                                              >
-                                                <td className="px-4 py-2 text-sm text-gray-900">
-                                                  {item.product_name}{' '}
-                                                  <span className="text-gray-400 text-xs">
-                                                    ({item.unit_of_measure})
-                                                  </span>
-                                                </td>
-                                                <td className="px-4 py-2 text-sm text-gray-600 text-right">
-                                                  {item.quantity}
-                                                </td>
-                                                <td className="px-4 py-2 text-sm text-gray-600 text-right">
-                                                  {formatPeso(item.unit_price)}
-                                                </td>
-                                                <td className="px-4 py-2 text-sm font-medium text-gray-900 text-right">
-                                                  {formatPeso(item.subtotal)}
-                                                </td>
-                                              </tr>
-                                            ),
-                                          )}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  )}
-                                </td>
-                              </tr>
-                            )}
-                          </>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="px-6 py-4 border-t flex items-center justify-between">
-                      <span className="text-xs text-gray-400">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          disabled={currentPage === 1}
-                          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          ← Prev
-                        </button>
-                        {Array.from(
-                          { length: Math.min(5, totalPages) },
-                          (_, i) => {
-                            const start = Math.max(
-                              1,
-                              Math.min(currentPage - 2, totalPages - 4),
-                            );
-                            return start + i;
-                          },
-                        ).map((page) => (
-                          <button
-                            key={page}
-                            onClick={() => handlePageChange(page)}
-                            className={`px-3 py-1.5 text-sm border rounded-lg transition-colors ${
-                              page === currentPage
-                                ? 'bg-blue-500 text-white border-blue-500'
-                                : 'border-gray-300 hover:bg-gray-50'
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        ))}
-                        <button
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          disabled={currentPage === totalPages}
-                          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                          Next →
-                        </button>
+                      <div className="w-full bg-slate-100 rounded-full h-2">
+                        <div
+                          className="bg-slate-900 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${barWidth}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span>
+                          {product.total_quantity.toLocaleString()} units
+                        </span>
+                        <span className="font-medium text-slate-700">
+                          {formatPeso(product.total_revenue)}
+                        </span>
                       </div>
                     </div>
-                  )}
-                </>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                <BarChart3 className="w-8 h-8 mb-2 opacity-40" />
+                <p className="text-sm">No sales in this period</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ── Transactions ────────────────────────────── */}
+        <Card className="overflow-hidden">
+          <div className="px-5 py-3 border-b bg-slate-50 flex items-center justify-between">
+            <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+              Transactions
+            </h2>
+            {!salesLoading && (
+              <span className="text-xs text-slate-400">
+                {totalSales.toLocaleString()} total
+              </span>
+            )}
           </div>
-        </div>
+
+          {salesLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
+            </div>
+          ) : sales.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+              <Receipt className="w-8 h-8 mb-2 opacity-40" />
+              <p className="text-sm font-medium">No transactions found</p>
+              <p className="text-xs mt-1">Try adjusting your date range</p>
+            </div>
+          ) : (
+            <>
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="text-xs uppercase tracking-wider">
+                        Date & Time
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">
+                        Cashier
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider text-right">
+                        Amount
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider">
+                        Method
+                      </TableHead>
+                      <TableHead className="text-xs uppercase tracking-wider text-center w-10"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sales.map((sale) => (
+                      <>
+                        <TableRow
+                          key={sale.id}
+                          onClick={() => handleRowClick(sale.id)}
+                          className={`cursor-pointer hover:bg-slate-50 transition-colors ${expandedSaleId === sale.id ? 'bg-blue-50/50' : ''}`}
+                        >
+                          <TableCell className="text-sm text-slate-500">
+                            {formatDateTime(sale.created_at)}
+                          </TableCell>
+                          <TableCell className="text-sm font-medium text-slate-900">
+                            {sale.cashier_name}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-slate-900">
+                            {formatPeso(sale.total_amount)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="text-xs capitalize bg-slate-50"
+                            >
+                              {sale.payment_method}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {expandedSaleId === sale.id ? (
+                              <ChevronUp className="w-4 h-4 text-slate-400 mx-auto" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-slate-400 mx-auto" />
+                            )}
+                          </TableCell>
+                        </TableRow>
+
+                        {expandedSaleId === sale.id && (
+                          <TableRow key={`${sale.id}-items`}>
+                            <TableCell colSpan={5} className="p-0 bg-slate-50">
+                              {itemsLoading && !expandedItems[sale.id] ? (
+                                <div className="flex justify-center py-4">
+                                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-900" />
+                                </div>
+                              ) : (
+                                <div className="px-6 py-3">
+                                  <div className="rounded-lg overflow-hidden border border-slate-200 bg-white">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow className="bg-slate-100">
+                                          <TableHead className="text-xs uppercase">
+                                            Product
+                                          </TableHead>
+                                          <TableHead className="text-xs uppercase text-right">
+                                            Qty
+                                          </TableHead>
+                                          <TableHead className="text-xs uppercase text-right">
+                                            Unit Price
+                                          </TableHead>
+                                          <TableHead className="text-xs uppercase text-right">
+                                            Subtotal
+                                          </TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {(expandedItems[sale.id] || []).map(
+                                          (item, idx) => (
+                                            <TableRow
+                                              key={idx}
+                                              className="hover:bg-slate-50"
+                                            >
+                                              <TableCell className="text-sm text-slate-900">
+                                                {item.product_name}
+                                                <span className="text-slate-400 text-xs ml-1">
+                                                  ({item.unit_of_measure})
+                                                </span>
+                                              </TableCell>
+                                              <TableCell className="text-right text-sm text-slate-600">
+                                                {item.quantity}
+                                              </TableCell>
+                                              <TableCell className="text-right text-sm text-slate-600">
+                                                {formatPeso(item.unit_price)}
+                                              </TableCell>
+                                              <TableCell className="text-right text-sm font-medium text-slate-900">
+                                                {formatPeso(item.subtotal)}
+                                              </TableCell>
+                                            </TableRow>
+                                          ),
+                                        )}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </div>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile card list */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {sales.map((sale) => (
+                  <div key={sale.id}>
+                    {/* Sale card */}
+                    <button
+                      onClick={() => handleRowClick(sale.id)}
+                      className={`w-full text-left px-4 py-4 hover:bg-slate-50 transition-colors ${expandedSaleId === sale.id ? 'bg-blue-50/30' : ''}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                            <User className="w-4 h-4 text-slate-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-900 truncate">
+                              {sale.cashier_name}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {formatDateShort(sale.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm font-bold text-slate-900">
+                            {formatPeso(sale.total_amount)}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className="text-xs capitalize mt-1"
+                          >
+                            {sale.payment_method}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end mt-2">
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                          {expandedSaleId === sale.id ? (
+                            <>
+                              <ChevronUp className="w-3 h-3" /> Hide items
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3 h-3" /> View items
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Expanded items on mobile */}
+                    {expandedSaleId === sale.id && (
+                      <div className="px-4 pb-4 bg-slate-50">
+                        {itemsLoading && !expandedItems[sale.id] ? (
+                          <div className="flex justify-center py-3">
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-slate-900" />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {(expandedItems[sale.id] || []).map((item, idx) => (
+                              <div
+                                key={idx}
+                                className="bg-white rounded-lg p-3 border border-slate-200"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-slate-900 truncate">
+                                      {item.product_name}
+                                    </p>
+                                    <p className="text-xs text-slate-400 mt-0.5">
+                                      {item.unit_of_measure} · {item.quantity}{' '}
+                                      pcs
+                                    </p>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <p className="text-sm font-semibold text-slate-900">
+                                      {formatPeso(item.subtotal)}
+                                    </p>
+                                    <p className="text-xs text-slate-400">
+                                      {formatPeso(item.unit_price)} each
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="px-4 sm:px-5 py-3 border-t flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-400">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCurrentPage(currentPage - 1);
+                        fetchSales(currentPage - 1);
+                      }}
+                      disabled={currentPage === 1}
+                      className="h-7 px-2 text-xs"
+                    >
+                      ←
+                    </Button>
+                    {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                      const start = Math.max(
+                        1,
+                        Math.min(currentPage - 1, totalPages - 2),
+                      );
+                      return start + i;
+                    }).map((page) => (
+                      <Button
+                        key={page}
+                        variant={page === currentPage ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          setCurrentPage(page);
+                          fetchSales(page);
+                        }}
+                        className={`h-7 px-2.5 text-xs ${page === currentPage ? 'bg-slate-900 hover:bg-slate-800' : ''}`}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCurrentPage(currentPage + 1);
+                        fetchSales(currentPage + 1);
+                      }}
+                      disabled={currentPage === totalPages}
+                      className="h-7 px-2 text-xs"
+                    >
+                      →
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
       </div>
     </Layout>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────
-// SUMMARY CARD — matches shadow-md / rounded-lg pattern from other pages
-// ─────────────────────────────────────────────────────────────────
-
-interface SummaryCardProps {
-  label: string;
-  value: string;
-  icon: string;
-  loading: boolean;
-}
-
-const SummaryCard: React.FC<SummaryCardProps> = ({
-  label,
-  value,
-  icon,
-  loading,
-}) => (
-  <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-    <div className="flex items-center gap-3 mb-3">
-      <span className="text-2xl">{icon}</span>
-      <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-        {label}
-      </span>
-    </div>
-    {loading ? (
-      <div className="h-8 bg-gray-200 rounded animate-pulse w-3/4" />
-    ) : (
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-    )}
-  </div>
-);
