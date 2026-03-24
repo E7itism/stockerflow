@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { dashboardAPI, inventoryAPI } from '../services/api';
+import { dashboardAPI, inventoryAPI, reportsAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 import {
   OverviewCards,
@@ -8,8 +8,10 @@ import {
   LowStockAlert,
   TopProductsChart,
 } from '../components/Dashboard/Index';
+import { RevenueChart } from '../components/Dashboard/RevenueChart';
 import type { DashboardData } from '../types/dashboard';
 import { useAuth } from '../context/AuthContext';
+import { useRole } from '../hooks/useRole';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Plus, ArrowRight, AlertTriangle } from 'lucide-react';
@@ -38,10 +40,13 @@ export const DashboardPage: React.FC = () => {
   );
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const { user } = useAuth();
+  const { canViewReports } = useRole();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,11 +57,13 @@ export const DashboardPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
+
       const [statsData, recentData, lowStockData] = await Promise.all([
         dashboardAPI.getStats(),
         inventoryAPI.getRecentTransactions(10),
         inventoryAPI.getLowStock(),
       ]);
+
       setDashboardData(statsData);
       setRecentActivity(recentData.transactions || recentData);
       setLowStockProducts(lowStockData.low_stock_products || lowStockData);
@@ -64,6 +71,19 @@ export const DashboardPage: React.FC = () => {
       setError(err.response?.data?.error || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
+    }
+
+    // Fetch chart separately so it doesn't block the main dashboard
+    if (canViewReports) {
+      try {
+        setChartLoading(true);
+        const chart = await reportsAPI.getRevenueChart(30);
+        setRevenueData(chart);
+      } catch {
+        // Chart failure is non-critical — don't block the whole dashboard
+      } finally {
+        setChartLoading(false);
+      }
     }
   };
 
@@ -99,24 +119,21 @@ export const DashboardPage: React.FC = () => {
   return (
     <Layout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* ── Greeting ─────────────────────────────────────── */}
+        {/* ── Greeting + Quick actions ─────────────────────── */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              {getGreeting()}, {user?.first_name}
+              {getGreeting()}, {user?.first_name} 👋
             </h1>
             <p className="text-sm text-slate-500 mt-1">{formatDate()}</p>
           </div>
-
-          {/* Quick actions */}
           <div className="flex gap-2 flex-wrap">
             <Button
               onClick={() => navigate('/products')}
               size="sm"
               className="bg-slate-900 hover:bg-slate-800 gap-2"
             >
-              <Plus className="w-4 h-4" />
-              Add Product
+              <Plus className="w-4 h-4" /> Add Product
             </Button>
             <Button
               onClick={() => navigate('/inventory')}
@@ -124,13 +141,12 @@ export const DashboardPage: React.FC = () => {
               size="sm"
               className="gap-2"
             >
-              <Plus className="w-4 h-4" />
-              Add Transaction
+              <Plus className="w-4 h-4" /> Add Transaction
             </Button>
           </div>
         </div>
 
-        {/* ── Low stock warning banner (prominent, near top) ── */}
+        {/* ── Low stock banner ─────────────────────────────── */}
         {lowStockCount > 0 && (
           <button
             onClick={() => navigate('/inventory')}
@@ -162,7 +178,12 @@ export const DashboardPage: React.FC = () => {
           {dashboardData && <OverviewCards stats={dashboardData} />}
         </div>
 
-        {/* ── Inventory value ──────────────────────────────── */}
+        {/* ── Revenue chart (admin/manager only) ───────────── */}
+        {canViewReports && (
+          <RevenueChart data={revenueData} loading={chartLoading} />
+        )}
+
+        {/* ── Inventory value banner ────────────────────────── */}
         {dashboardData && (
           <Card className="bg-slate-900 border-slate-900 text-white overflow-hidden">
             <CardContent className="p-6">
@@ -195,7 +216,7 @@ export const DashboardPage: React.FC = () => {
           <TopProductsChart products={dashboardData?.top_products || []} />
         </div>
 
-        {/* ── Low stock detail cards ────────────────────────── */}
+        {/* ── Low stock detail ─────────────────────────────── */}
         <LowStockAlert products={lowStockProducts} />
       </div>
     </Layout>
