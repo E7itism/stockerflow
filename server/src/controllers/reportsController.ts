@@ -263,4 +263,40 @@ export const reportsController = {
       res.status(500).json({ error: 'Failed to fetch sale items' });
     }
   },
+  getRevenueChart: async (req: Request, res: Response) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+
+      const result = await pool.query(
+        `
+        SELECT
+          d.date::date                              AS date,
+          COALESCE(SUM(s.total_amount), 0)          AS revenue,
+          COUNT(s.id)                               AS transactions
+        FROM generate_series(
+          CURRENT_DATE - INTERVAL '1 day' * ($1 - 1),
+          CURRENT_DATE,
+          INTERVAL '1 day'
+        ) AS d(date)
+        LEFT JOIN sales s
+          ON s.created_at::date = d.date::date
+        GROUP BY d.date
+        ORDER BY d.date ASC
+      `,
+        [days],
+      );
+
+      res.json({
+        days,
+        chart: result.rows.map((row) => ({
+          date: row.date,
+          revenue: parseFloat(row.revenue),
+          transactions: parseInt(row.transactions),
+        })),
+      });
+    } catch (error) {
+      console.error('[reportsController.getRevenueChart] Error:', error);
+      res.status(500).json({ error: 'Failed to fetch revenue chart data' });
+    }
+  },
 };

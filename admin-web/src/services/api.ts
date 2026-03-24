@@ -376,6 +376,22 @@ export const reportsAPI = {
     );
     return response.data.items;
   },
+  /** GET /api/reports/revenue-chart?days=30 */
+  getRevenueChart: async (
+    days = 30,
+  ): Promise<
+    {
+      date: string;
+      revenue: number;
+      transactions: number;
+    }[]
+  > => {
+    const response = await api.get<{
+      days: number;
+      chart: { date: string; revenue: number; transactions: number }[];
+    }>(`/reports/revenue-chart?days=${days}`);
+    return response.data.chart;
+  },
 };
 // ═══════════════════════════════════════════════════════════════════
 // USERS (Admin only)
