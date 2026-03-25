@@ -1,28 +1,26 @@
-# 🏪 STOCKER + POS System
+# Stockerflow — Inventory Management and POS System
 
-> A full-stack inventory management and point-of-sale system built for small businesses and sari-sari stores in the Philippines.
-
-Built as a **monorepo** — two apps, one backend, one database. Changes in STOCKER reflect instantly in the POS and vice versa.
-
-![STOCKER Dashboard](screenshots/dashboard.PNG)
+A full-stack inventory management and point-of-sale system built for small businesses in the Philippines. Built as a monorepo — two frontend apps sharing one Express backend and one PostgreSQL database. Changes in STOCKER reflect instantly in the POS and vice versa.
 
 ---
 
-## 🌐 Live Demo
+## Live Demo
 
-| App             | URL                                                              |
-| --------------- | ---------------------------------------------------------------- |
-| STOCKER (Admin) | [stockerflow.vercel.app](https://stockerflow.vercel.app)         |
-| POS (Cashier)   | [stockerflow-pos.vercel.app](https://stockerflow-pos.vercel.app) |
+| App             | URL                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| STOCKER (Admin) | [stockerflow.vercel.app](https://stockerflow.vercel.app)                                       |
+| STOCKPOS (POS)  | [stockerflow-pos.vercel.app](https://stockerflow-pos.vercel.app)                               |
+| Backend API     | [stockerflow-production.up.railway.app/api](https://stockerflow-production.up.railway.app/api) |
 
-| Test Account | Credentials   |
-| ------------ | ------------- |
-| Email        | demo@mail.com |
-| Password     | demo123       |
+| Credential | Value               |
+| ---------- | ------------------- |
+| Email      | admin@demo.com      |
+| Password   | demo123             |
+| Role       | Admin (full access) |
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 ### STOCKER — Dashboard
 
@@ -44,123 +42,167 @@ Built as a **monorepo** — two apps, one backend, one database. Changes in STOC
 
 ![Products Mobile](screenshots/products-mobile.PNG)
 
-### POS — Login
+### STOCKPOS — Login
 
 ![POS Login](screenshots/pos-login.PNG)
 
-### POS — Product Browser
+### STOCKPOS — Product Browser
 
 ![POS Products](screenshots/pos-products.PNG)
 
-### POS — Cart
+### STOCKPOS — Cart
 
 ![POS Cart](screenshots/pos-cart.PNG)
 
-### POS — Checkout
+### STOCKPOS — Checkout
 
 ![POS Checkout](screenshots/pos-checkout.PNG)
 
-### POS — Receipt
+### STOCKPOS — Receipt
 
 ![POS Receipt](screenshots/pos-receipt.PNG)
 
-### POS — Mobile View
+### STOCKPOS — Mobile View
 
 ![POS Mobile](screenshots/pos-mobile.PNG)
 
 ---
 
-## ✨ Features
+## Features
 
 ### STOCKER (Admin Dashboard)
 
-- 📊 **Real-time Dashboard** — inventory value, low stock alerts, recent transactions
-- 📦 **Product Management** — full CRUD with unit of measure support
-- 📁 **Categories & Suppliers** — organize your inventory
-- 📈 **Inventory Tracking** — stock in, stock out, adjustments with full audit trail
-- ⚠️ **Low Stock Alerts** — notified when stock hits reorder level
-- 📱 **Mobile Responsive** — desktop table view + mobile card view
+- **Real-time Dashboard** — inventory value, revenue chart, low stock alerts, recent transactions
+- **Product Management** — full CRUD with SKU, unit of measure, reorder level, category, and supplier
+- **Categories and Suppliers** — organize inventory with relational data
+- **Inventory Tracking** — stock in, stock out, and adjustments with full audit trail
+- **Sales Reports** — date-filtered summary, top products, transaction list, CSV export
+- **User Management** — invite users, assign roles, deactivate accounts
+- **Role-Based Access Control** — admin, manager, and staff roles with granular permissions
+- **Mobile Responsive** — desktop table view with mobile card fallback
 
-### POS (Cashier Screen)
+### STOCKPOS (Cashier Screen)
 
-- 🛍️ **Product Browser** — searchable product grid with live stock levels
-- 🛒 **Cart** — add items, adjust quantities, remove items
-- 💵 **Checkout** — cash tendered + automatic change calculation
-- 🧾 **Receipt** — shown after every sale
-- 📋 **Sales History** — today's sales with total revenue summary
-- 📱 **Mobile-First** — tab layout on phone, split panel on tablet/desktop
-- 👴 **Accessible** — large touch targets, clear labels, designed for non-tech-savvy users
+- **Product Browser** — category filter, search, live stock levels
+- **Cart** — add items, adjust quantities, remove items
+- **Checkout** — cash tendered with automatic change calculation
+- **Receipt** — printed after every sale with snapshot pricing
+- **Sales History** — today's transactions with revenue summary
+- **Mobile-First** — tab layout on phone, split panel on tablet and desktop
 
 ### System-Wide
 
-- 🔄 **Automatic Sync** — POS sales instantly deduct from STOCKER inventory
-- 🔐 **JWT Authentication** — separate sessions for admin and cashier
-- 🇵🇭 **Philippine-ready** — VAT (12%), peso formatting, local units of measure
+- **Automatic Sync** — POS sales instantly deduct from STOCKER inventory via shared DB
+- **JWT Authentication** — separate sessions for admin and cashier apps
+- **Philippine-ready** — peso formatting, local units of measure
 
 ---
 
-## 🏗️ System Design
+## Role-Based Access Control
 
-```
-┌─────────────────┐     ┌─────────────────┐
-│   STOCKER       │     │   POS           │
-│   (Admin)       │     │   (Cashier)     │
-│   admin-web/    │     │   pos-web/      │
-└────────┬────────┘     └────────┬────────┘
-         │                       │
-         └──────────┬────────────┘
-                    │
-         ┌──────────▼────────────┐
-         │   Express Backend     │
-         │   server/             │
-         └──────────┬────────────┘
-                    │
-         ┌──────────▼────────────┐
-         │   PostgreSQL          │
-         │   One shared database │
-         └───────────────────────┘
-```
+| Page / Action         | Admin | Manager | Staff |
+| --------------------- | ----- | ------- | ----- |
+| Dashboard             | Yes   | Yes     | Yes   |
+| Products (view)       | Yes   | Yes     | Yes   |
+| Products (add / edit) | Yes   | Yes     | No    |
+| Products (delete)     | Yes   | No      | No    |
+| Inventory             | Yes   | Yes     | Yes   |
+| Categories            | Yes   | Yes     | No    |
+| Suppliers             | Yes   | Yes     | No    |
+| Sales Reports         | Yes   | Yes     | No    |
+| Revenue Chart         | Yes   | Yes     | No    |
+| User Management       | Yes   | No      | No    |
 
-**Why monorepo?** Both apps share one backend and one database. When a cashier processes a sale, the POS writes an `inventory_transaction` row — the same table STOCKER reads to calculate stock. No syncing layer needed.
+Enforced on both frontend (route guards, sidebar filtering, conditional UI) and backend (middleware on every protected route).
 
 ---
 
-## 🛠️ Tech Stack
+## System Design
 
-### Frontend (Both Apps)
+```
++------------------+       +------------------+
+|    STOCKER       |       |    STOCKPOS      |
+|    (Admin)       |       |    (Cashier)     |
+|    admin-web/    |       |    pos-web/      |
++--------+---------+       +--------+---------+
+         |                          |
+         +-------------+------------+
+                       |
+              +--------+---------+
+              |  Express Backend  |
+              |    server/        |
+              +--------+---------+
+                       |
+              +--------+---------+
+              |    PostgreSQL     |
+              |  Shared database  |
+              +------------------+
+```
 
-| Tech         | Purpose      |
-| ------------ | ------------ |
-| React 18     | UI Framework |
-| TypeScript   | Type Safety  |
-| Tailwind CSS | Styling      |
-| React Router | Navigation   |
-| Axios        | API Calls    |
-| Vite         | Build Tool   |
+**Why a monorepo?** Both apps share one backend and one database. When a cashier processes a sale, the POS writes an `inventory_transaction` row — the same table STOCKER reads to calculate stock. No syncing layer, no duplication.
 
-### Backend
+---
 
-| Tech       | Purpose          |
+## Tech Stack
+
+### STOCKER (admin-web)
+
+| Technology      | Purpose             |
+| --------------- | ------------------- |
+| React 18        | UI framework        |
+| TypeScript      | Type safety         |
+| Vite            | Build tool          |
+| Tailwind CSS v4 | Styling             |
+| shadcn/ui       | Component library   |
+| Lucide React    | Icons               |
+| React Router v6 | Client-side routing |
+| Axios           | HTTP client         |
+| Recharts        | Revenue chart       |
+| react-hot-toast | Toast notifications |
+
+### STOCKPOS (pos-web)
+
+| Technology      | Purpose             |
+| --------------- | ------------------- |
+| React 18        | UI framework        |
+| TypeScript      | Type safety         |
+| Vite            | Build tool          |
+| Tailwind CSS    | Styling             |
+| React Router v7 | Client-side routing |
+| Axios           | HTTP client         |
+| react-hot-toast | Toast notifications |
+
+### Backend (server)
+
+| Technology | Purpose          |
 | ---------- | ---------------- |
-| Node.js    | Runtime          |
-| Express.js | Web Framework    |
+| Node.js 18 | Runtime          |
+| Express.js | Web framework    |
 | PostgreSQL | Database         |
+| pg         | Database client  |
 | JWT        | Authentication   |
-| bcrypt     | Password Hashing |
+| bcrypt     | Password hashing |
+| TypeScript | Type safety      |
 
 ### Deployment
 
-| Service | Purpose            |
-| ------- | ------------------ |
-| Vercel  | Frontend Hosting   |
-| Railway | Backend + Database |
+| Service | Purpose              |
+| ------- | -------------------- |
+| Vercel  | Both frontend apps   |
+| Railway | Backend + PostgreSQL |
 
 ---
 
-## 🗄️ Database Schema
+## Database Schema
 
 ```sql
-users (id, email, password_hash, first_name, last_name, role, created_at)
+users (
+  id, email, password_hash,
+  first_name, last_name,
+  role,        -- 'admin' | 'manager' | 'staff'
+  is_active,   -- soft delete: preserves audit trail
+  created_at
+)
 
 categories (id, name, description, created_at)
 
@@ -168,52 +210,54 @@ suppliers (id, name, contact_person, email, phone, address, created_at)
 
 products (
   id, sku, name, description,
-  category_id → categories,
-  supplier_id → suppliers,
+  category_id  --> categories,
+  supplier_id  --> suppliers,
   unit_price, unit_of_measure,
   reorder_level, created_at, updated_at
 )
 
 inventory_transactions (
-  id, product_id → products,
-  transaction_type ['in'|'out'|'adjustment'],
-  quantity, user_id → users, notes, created_at
+  id, product_id --> products,
+  transaction_type,  -- 'in' | 'out' | 'adjustment'
+  quantity, user_id --> users,
+  notes, created_at
 )
 
--- THE BRIDGE: POS writes 'out' rows, STOCKER writes 'in' rows.
--- Both apps read the same table. Stock = SUM of all transactions.
+-- Stock is never stored. It is always calculated:
+-- current_stock = SUM(quantity) across all transactions for a product
 
 sales (
-  id, cashier_id → users,
+  id, cashier_id --> users,
   total_amount, cash_tendered, change_amount,
   payment_method, created_at
 )
 
 sale_items (
-  id, sale_id → sales, product_id → products,
-  product_name,     -- snapshot: frozen at time of sale
-  unit_of_measure,  -- snapshot: won't change if product is edited later
-  unit_price,       -- snapshot: receipt always shows what customer paid
+  id, sale_id --> sales, product_id --> products,
+  product_name,    -- snapshot at time of sale
+  unit_of_measure, -- snapshot at time of sale
+  unit_price,      -- snapshot at time of sale
   quantity, subtotal
 )
 ```
 
-**Key decisions:**
+**Key architectural decisions:**
 
-- **Stock is calculated, not stored** — `current_stock = SUM(transactions)`. Complete audit trail, always accurate.
-- **Snapshots in sale_items** — product name/price can change later. Receipts show what the customer actually paid.
-- **Atomic transactions** — sale + sale_items + inventory_transactions saved together. If anything fails, nothing saves.
+- **Stock is calculated, not stored.** `current_stock` is a database view — the sum of all inventory transactions per product. This gives a complete audit trail and eliminates sync bugs.
+- **Snapshot pattern in sale_items.** Product name and price are copied at sale time. Receipts always reflect what the customer actually paid, even if the product is edited later.
+- **Atomic sale transactions.** Creating a sale wraps the insert into `sales`, `sale_items`, and `inventory_transactions` in a single DB transaction. If anything fails, nothing is saved.
+- **Soft delete on users.** Setting `is_active = false` blocks login without destroying historical data. Sales and inventory records remain intact and attributed correctly.
 
 ---
 
-## 🔌 API Reference
+## API Reference
 
 ### Authentication
 
 ```
-POST  /api/auth/login        Login (returns JWT)
-POST  /api/auth/register     Register new user
-GET   /api/auth/me           Get current user
+POST  /api/auth/login       Login — returns JWT, blocks inactive users
+POST  /api/auth/register    Register new user
+GET   /api/auth/me          Get current user from token
 ```
 
 ### Products
@@ -226,49 +270,93 @@ PUT    /api/products/:id      Update product
 DELETE /api/products/:id      Delete product
 ```
 
+### Categories / Suppliers
+
+```
+GET    /api/categories
+POST   /api/categories
+PUT    /api/categories/:id
+DELETE /api/categories/:id
+
+GET    /api/suppliers
+POST   /api/suppliers
+PUT    /api/suppliers/:id
+DELETE /api/suppliers/:id
+```
+
 ### Inventory
 
 ```
-GET   /api/inventory/transactions        All transactions
-POST  /api/inventory/transactions        Create transaction
-GET   /api/inventory/transactions/recent Recent activity
-GET   /api/inventory/stock/low           Low stock products
+GET   /api/inventory/transactions           All transactions
+POST  /api/inventory/transactions           Create transaction
+GET   /api/inventory/transactions/recent    Recent activity
+GET   /api/inventory/stock/low              Products below reorder level
+GET   /api/inventory/products/:id/stock     Stock level for one product
+```
+
+### Dashboard
+
+```
+GET   /api/dashboard/stats    Summary stats for dashboard cards
 ```
 
 ### POS
 
 ```
-GET   /api/pos/products        Products with live stock (for cashier)
-GET   /api/pos/products/:id    Single product
-POST  /api/pos/sales           Create sale (atomic)
-GET   /api/pos/sales           Sales list (filterable by date)
-GET   /api/pos/sales/:id       Single sale with line items
+GET   /api/pos/products          Products with live stock (cashier view)
+POST  /api/pos/sales             Create sale — atomic
+GET   /api/pos/sales             Sales list, filterable by ?from=&to=
+GET   /api/pos/sales/:id         Single sale with line items
+```
+
+### Reports (admin and manager only)
+
+```
+GET   /api/reports/summary?from=&to=            Summary cards
+GET   /api/reports/sales?from=&to=&page=&limit= Paginated transactions
+GET   /api/reports/sales/:id/items              Line items for one sale
+GET   /api/reports/revenue-chart?days=30        Daily revenue using generate_series
+```
+
+### Users (admin only)
+
+```
+GET   /api/users                All users
+PUT   /api/users/:id/role       Update role
+PUT   /api/users/:id/status     Activate or deactivate
 ```
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 stockerflow/
-├── admin-web/          # STOCKER — React admin dashboard
+├── admin-web/                  # STOCKER — React admin dashboard
 │   └── src/
 │       ├── components/
-│       │   ├── Products/
-│       │   │   └── ProductModal.tsx
-│       │   ├── Dashboard/
+│       │   ├── Dashboard/      # OverviewCards, RevenueChart, LowStockAlert, etc.
+│       │   ├── Products/       # ProductModal (shadcn Dialog)
+│       │   ├── ui/             # shadcn components
 │       │   ├── Layout.tsx
-│       │   └── Navbar.tsx
+│       │   ├── Sidebar.tsx     # Role-filtered navigation
+│       │   ├── ProtectedRoute.tsx
+│       │   └── RoleProtectedRoute.tsx
 │       ├── pages/
 │       │   ├── DashboardPage.tsx
 │       │   ├── ProductsPage.tsx
 │       │   ├── CategoriesPage.tsx
-│       │   ├── SuppliersPage.tsx
-│       │   └── InventoryPage.tsx
+│       │   ├── SupplierPage.tsx
+│       │   ├── InventoryPage.tsx
+│       │   ├── SalesReportsPage.tsx
+│       │   ├── UsersPage.tsx
+│       │   ├── LoginPage.tsx
+│       │   └── RegisterPage.tsx
 │       ├── context/AuthContext.tsx
+│       ├── hooks/useRole.ts    # isAdmin, canEdit, canDelete, canViewReports
 │       └── services/api.ts
 │
-├── pos-web/            # POS — React cashier screen
+├── pos-web/                    # STOCKPOS — Cashier screen
 │   └── src/
 │       ├── components/
 │       │   ├── cart/CheckoutModal.tsx
@@ -281,31 +369,32 @@ stockerflow/
 │       ├── hooks/useCart.ts
 │       └── services/api.ts
 │
-└── server/             # Shared Express backend
+└── server/                     # Shared Express backend
     ├── migrations/
     │   ├── 001_init.sql
-    │   └── 002_add_pos_tables.sql
+    │   ├── 002_add_pos_tables.sql
+    │   ├── 003_add_user_management.sql
+    │   └── 004_seed_admin.sql
     └── src/
         ├── controllers/
         │   ├── authController.ts
-        │   ├── productController.ts
+        │   ├── categoryController.ts
+        │   ├── dashboardController.ts
         │   ├── inventoryController.ts
-        │   └── posController.ts
-        ├── models/
-        │   └── productModel.ts
+        │   ├── posController.ts
+        │   ├── productController.ts
+        │   ├── reportsController.ts
+        │   ├── supplierController.ts
+        │   └── userController.ts
         ├── routes/
-        │   ├── authRoutes.ts
-        │   ├── productRoutes.ts
-        │   ├── inventoryRoutes.ts
-        │   └── posRoutes.ts
         ├── middleware/authMiddleware.ts
         ├── config/database.ts
-        └── runMigration.ts
+        └── server.ts
 ```
 
 ---
 
-## 🏃 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -342,10 +431,10 @@ cp .env.example .env
 # VITE_API_URL=http://localhost:5000/api
 
 npm run dev
-# Opens at http://localhost:5173
+# Runs on http://localhost:3001
 ```
 
-### 4. POS (Cashier)
+### 4. STOCKPOS (Cashier)
 
 ```bash
 cd pos-web
@@ -354,12 +443,12 @@ cp .env.example .env
 # VITE_API_URL=http://localhost:5000/api
 
 npm run dev
-# Opens at http://localhost:5174
+# Runs on http://localhost:5174
 ```
 
 ---
 
-## ⚙️ Environment Variables
+## Environment Variables
 
 ### Backend (`server/.env`)
 
@@ -378,14 +467,14 @@ VITE_API_URL=http://localhost:5000/api
 
 ---
 
-## 🚀 Deployment
+## Deployment
 
-### Frontend → Vercel
+### Frontend — Vercel
 
 1. Push to GitHub
-2. Import in [vercel.com](https://vercel.com)
+2. Import project at [vercel.com](https://vercel.com)
 3. Set root directory to `admin-web` or `pos-web`
-4. Add environment variable: `VITE_API_URL=https://your-railway-url.railway.app/api`
+4. Set environment variable: `VITE_API_URL=https://your-railway-url.railway.app/api`
 5. Add `vercel.json` in the app folder for SPA routing:
 
 ```json
@@ -396,43 +485,53 @@ VITE_API_URL=http://localhost:5000/api
 
 6. Deploy
 
-### Backend → Railway
+### Backend — Railway
 
-1. Create project in [railway.app](https://railway.app)
-2. Add PostgreSQL service
-3. Deploy from GitHub, root directory: `server`
+1. Create a new project at [railway.app](https://railway.app)
+2. Add a PostgreSQL service
+3. Deploy from GitHub with root directory set to `server`
 4. Set environment variables: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV=production`
 5. Pre-deploy command: `npm run build`
 6. Start command: `npm run deploy` (runs migrate then start)
 
 ---
 
-## 📋 Changelog
+## Changelog
+
+### v3.0.0 (March 2026)
+
+- Role-based access control (admin / manager / staff)
+- User management page — role assignment, deactivate / reactivate accounts
+- Sales Reports — date filter, summary cards, top products, CSV export
+- Revenue chart on dashboard (Recharts, admin and manager only)
+- Low stock banner with link to inventory page
+- Full shadcn/ui redesign of admin dashboard
+- Migrated admin-web from Create React App to Vite
+- Demo login button on both apps
 
 ### v2.0.0 (February 2026)
 
-- ✅ Added full POS system (pos-web)
-- ✅ Monorepo structure (admin-web + pos-web + server)
-- ✅ Sales and sale_items tables with receipt snapshots
-- ✅ Automatic inventory sync — POS sales deduct from STOCKER
-- ✅ Mobile-first POS with tab navigation
-- ✅ Sales history page
-- ✅ unit_of_measure field on products
-- ✅ Sequential migration system
-- ✅ Deployed POS to Vercel
+- Full POS system (pos-web)
+- Monorepo structure (admin-web + pos-web + server)
+- Sales and sale_items tables with receipt snapshots
+- Automatic inventory sync — POS sales deduct from STOCKER
+- Mobile-first POS with tab navigation
+- Sales history page
+- Sequential migration system
+- Deployed POS to Vercel
 
 ### v1.0.0 (February 2026)
 
-- ✅ STOCKER inventory management system
-- ✅ Full CRUD for products, categories, suppliers
-- ✅ Dashboard with real-time stats
-- ✅ Low stock alerts
-- ✅ JWT authentication
-- ✅ Mobile responsive
+- STOCKER inventory management system
+- Full CRUD for products, categories, suppliers
+- Dashboard with real-time stats
+- Low stock alerts
+- JWT authentication
+- Mobile responsive layout
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Eliezer Gaudiel Jr**
 
@@ -442,6 +541,6 @@ VITE_API_URL=http://localhost:5000/api
 
 ---
 
-## 📜 License
+## License
 
-MIT License — feel free to use this for learning or as a portfolio piece.
+MIT License — free to use for learning or as a portfolio reference.
