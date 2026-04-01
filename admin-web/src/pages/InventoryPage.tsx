@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { inventoryAPI, productsAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -18,13 +19,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
   SlidersHorizontal,
   Plus,
   ClipboardList,
+  Search,
+  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -79,6 +81,8 @@ const formatDate = (d: string) =>
     minute: '2-digit',
   });
 
+const toDateInput = (d: Date) => d.toISOString().split('T')[0];
+
 const fieldClass =
   'w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none';
 
@@ -88,8 +92,12 @@ export const InventoryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-  const [filterProduct, setFilterProduct] = useState('all');
+
+  // ── Filters ───────────────────────────────────────────────────
+  const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [filterFrom, setFilterFrom] = useState('');
+  const [filterTo, setFilterTo] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -112,21 +120,75 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
-  const filtered = transactions.filter((t) => {
-    if (filterProduct !== 'all' && t.product_id.toString() !== filterProduct)
-      return false;
-    if (filterType !== 'all' && t.transaction_type !== filterType) return false;
-    return true;
-  });
+  /**
+   * filtered — applies all active filters simultaneously.
+   * useMemo prevents recalculation on every render.
+   * All filters are client-side — no extra API calls needed.
+   */
+  const filtered = useMemo(() => {
+    return transactions.filter((t) => {
+      // Search — matches product name, SKU, or user name
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        const matchesSearch =
+          t.product_name.toLowerCase().includes(q) ||
+          t.sku.toLowerCase().includes(q) ||
+          t.user_name.toLowerCase().includes(q);
+        if (!matchesSearch) return false;
+      }
+
+      // Transaction type filter
+      if (filterType !== 'all' && t.transaction_type !== filterType)
+        return false;
+
+      // Date range filter
+      if (filterFrom) {
+        const txDate = new Date(t.created_at).toISOString().split('T')[0];
+        if (txDate < filterFrom) return false;
+      }
+      if (filterTo) {
+        const txDate = new Date(t.created_at).toISOString().split('T')[0];
+        if (txDate > filterTo) return false;
+      }
+
+      return true;
+    });
+  }, [transactions, search, filterType, filterFrom, filterTo]);
+
+  const hasActiveFilters =
+    search || filterType !== 'all' || filterFrom || filterTo;
+
+  const clearFilters = () => {
+    setSearch('');
+    setFilterType('all');
+    setFilterFrom('');
+    setFilterTo('');
+  };
+
+  // Summary counts for the active filtered set
+  const summary = useMemo(
+    () => ({
+      in: filtered
+        .filter((t) => t.transaction_type === 'in')
+        .reduce((s, t) => s + t.quantity, 0),
+      out: filtered
+        .filter((t) => t.transaction_type === 'out')
+        .reduce((s, t) => s + t.quantity, 0),
+      adjustment: filtered.filter((t) => t.transaction_type === 'adjustment')
+        .length,
+    }),
+    [filtered],
+  );
 
   return (
     <Layout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* ── Header ──────────────────────────────────────── */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
             <p className="text-sm text-slate-500 mt-1">
-              {transactions.length} total transactions
+              {filtered.length} of {transactions.length} transactions
             </p>
           </div>
           <Button
@@ -137,35 +199,96 @@ export const InventoryPage: React.FC = () => {
           </Button>
         </div>
 
+        {/* ── Filters ─────────────────────────────────────── */}
         <Card>
-          <CardContent className="p-3">
+          <CardContent className="p-4 space-y-3">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Search by product, SKU or user..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-10"
+              />
+            </div>
+
+            {/* Type + Date range */}
             <div className="flex flex-col sm:flex-row gap-3">
-              <select
-                value={filterProduct}
-                onChange={(e) => setFilterProduct(e.target.value)}
-                className={`${fieldClass} sm:w-64`}
-              >
-                <option value="all">All Products</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.sku})
-                  </option>
-                ))}
-              </select>
+              {/* Type filter */}
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className={`${fieldClass} sm:w-48`}
+                className={`${fieldClass} sm:w-44`}
               >
                 <option value="all">All Types</option>
                 <option value="in">Stock In</option>
                 <option value="out">Stock Out</option>
                 <option value="adjustment">Adjustment</option>
               </select>
+
+              {/* Date range */}
+              <div className="flex items-center gap-2 flex-1">
+                <div className="space-y-0.5 flex-1">
+                  <label className="text-xs text-slate-500 ml-1">From</label>
+                  <input
+                    type="date"
+                    value={filterFrom}
+                    onChange={(e) => setFilterFrom(e.target.value)}
+                    className={fieldClass}
+                  />
+                </div>
+                <div className="space-y-0.5 flex-1">
+                  <label className="text-xs text-slate-500 ml-1">To</label>
+                  <input
+                    type="date"
+                    value={filterTo}
+                    max={toDateInput(new Date())}
+                    onChange={(e) => setFilterTo(e.target.value)}
+                    className={fieldClass}
+                  />
+                </div>
+              </div>
+
+              {/* Clear filters */}
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="gap-1.5 text-slate-500 self-end h-10"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Clear
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
 
+        {/* ── Summary strip (only when filters active) ────── */}
+        {hasActiveFilters && filtered.length > 0 && (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-center">
+              <p className="text-lg font-bold text-emerald-700">
+                +{summary.in}
+              </p>
+              <p className="text-xs text-emerald-600 mt-0.5">Units In</p>
+            </div>
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-center">
+              <p className="text-lg font-bold text-red-700">-{summary.out}</p>
+              <p className="text-xs text-red-600 mt-0.5">Units Out</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-center">
+              <p className="text-lg font-bold text-amber-700">
+                {summary.adjustment}
+              </p>
+              <p className="text-xs text-amber-600 mt-0.5">Adjustments</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Content ─────────────────────────────────────── */}
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
@@ -182,11 +305,26 @@ export const InventoryPage: React.FC = () => {
             <CardContent className="flex flex-col items-center justify-center py-16 text-slate-400">
               <ClipboardList className="w-10 h-10 mb-3 opacity-40" />
               <p className="font-medium">No transactions found</p>
-              <p className="text-sm mt-1">Try adjusting your filters</p>
+              <p className="text-sm mt-1">
+                {hasActiveFilters
+                  ? 'Try adjusting your filters'
+                  : 'Add your first transaction to get started'}
+              </p>
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="mt-3 gap-1.5"
+                >
+                  <X className="w-3.5 h-3.5" /> Clear filters
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
           <>
+            {/* Desktop table */}
             <div className="hidden md:block">
               <Card className="overflow-hidden">
                 <Table>
@@ -260,6 +398,7 @@ export const InventoryPage: React.FC = () => {
               </Card>
             </div>
 
+            {/* Mobile cards */}
             <div className="md:hidden space-y-3">
               {filtered.map((t) => {
                 const config = typeConfig[t.transaction_type];
@@ -327,6 +466,10 @@ export const InventoryPage: React.FC = () => {
     </Layout>
   );
 };
+
+// ─────────────────────────────────────────────
+// TRANSACTION MODAL
+// ─────────────────────────────────────────────
 
 interface ModalProps {
   products: Product[];
