@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { inventoryAPI, productsAPI } from '../services/api';
+import { inventoryAPI, productsAPI, categoriesAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,14 @@ interface Product {
   id: number;
   name: string;
   sku: string;
+  category_id: number;
+  category_name?: string;
   current_stock?: number;
+}
+
+interface Category {
+  id: number;
+  name: string;
 }
 
 const typeConfig = {
@@ -89,6 +96,7 @@ const fieldClass =
 export const InventoryPage: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -96,6 +104,7 @@ export const InventoryPage: React.FC = () => {
   // ── Filters ───────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
 
@@ -107,12 +116,14 @@ export const InventoryPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const [txData, prodData] = await Promise.all([
+      const [txData, prodData, catData] = await Promise.all([
         inventoryAPI.getAllTransactions(),
         productsAPI.getAll(),
+        categoriesAPI.getAll(),
       ]);
       setTransactions(txData.transactions || txData);
       setProducts(prodData.products || prodData);
+      setCategories(catData.categories || catData);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load inventory data');
     } finally {
@@ -121,27 +132,40 @@ export const InventoryPage: React.FC = () => {
   };
 
   /**
-   * filtered — applies all active filters simultaneously.
-   * useMemo prevents recalculation on every render.
-   * All filters are client-side — no extra API calls needed.
+   * productCategoryMap — maps product_id → category_id for fast lookup.
+   * WHY a Map? O(1) lookup per transaction instead of O(n) array.find().
+   * Built once from products, reused for every transaction in the filter.
    */
+  const productCategoryMap = useMemo(() => {
+    const map = new Map<number, number>();
+    products.forEach((p) => map.set(p.id, p.category_id));
+    return map;
+  }, [products]);
+
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
-      // Search — matches product name, SKU, or user name
+      // Search — product name, SKU, or user name
       if (search.trim()) {
         const q = search.toLowerCase();
-        const matchesSearch =
-          t.product_name.toLowerCase().includes(q) ||
-          t.sku.toLowerCase().includes(q) ||
-          t.user_name.toLowerCase().includes(q);
-        if (!matchesSearch) return false;
+        if (
+          !t.product_name.toLowerCase().includes(q) &&
+          !t.sku.toLowerCase().includes(q) &&
+          !t.user_name.toLowerCase().includes(q)
+        )
+          return false;
       }
 
-      // Transaction type filter
+      // Transaction type
       if (filterType !== 'all' && t.transaction_type !== filterType)
         return false;
 
-      // Date range filter
+      // Category — look up the product's category from the map
+      if (filterCategory !== 'all') {
+        const catId = productCategoryMap.get(t.product_id);
+        if (catId?.toString() !== filterCategory) return false;
+      }
+
+      // Date range
       if (filterFrom) {
         const txDate = new Date(t.created_at).toISOString().split('T')[0];
         if (txDate < filterFrom) return false;
@@ -153,19 +177,31 @@ export const InventoryPage: React.FC = () => {
 
       return true;
     });
-  }, [transactions, search, filterType, filterFrom, filterTo]);
+  }, [
+    transactions,
+    search,
+    filterType,
+    filterCategory,
+    filterFrom,
+    filterTo,
+    productCategoryMap,
+  ]);
 
   const hasActiveFilters =
-    search || filterType !== 'all' || filterFrom || filterTo;
+    search ||
+    filterType !== 'all' ||
+    filterCategory !== 'all' ||
+    filterFrom ||
+    filterTo;
 
   const clearFilters = () => {
     setSearch('');
     setFilterType('all');
+    setFilterCategory('all');
     setFilterFrom('');
     setFilterTo('');
   };
 
-  // Summary counts for the active filtered set
   const summary = useMemo(
     () => ({
       in: filtered
@@ -213,9 +249,9 @@ export const InventoryPage: React.FC = () => {
               />
             </div>
 
-            {/* Type + Date range */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              {/* Type filter */}
+            {/* Type + Category + Date range */}
+            <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+              {/* Transaction type */}
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
@@ -225,6 +261,20 @@ export const InventoryPage: React.FC = () => {
                 <option value="in">Stock In</option>
                 <option value="out">Stock Out</option>
                 <option value="adjustment">Adjustment</option>
+              </select>
+
+              {/* Category filter */}
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className={`${fieldClass} sm:w-48`}
+              >
+                <option value="all">All Categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
 
               {/* Date range */}
@@ -250,7 +300,7 @@ export const InventoryPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Clear filters */}
+              {/* Clear */}
               {hasActiveFilters && (
                 <Button
                   variant="outline"
@@ -258,15 +308,14 @@ export const InventoryPage: React.FC = () => {
                   onClick={clearFilters}
                   className="gap-1.5 text-slate-500 self-end h-10"
                 >
-                  <X className="w-3.5 h-3.5" />
-                  Clear
+                  <X className="w-3.5 h-3.5" /> Clear
                 </Button>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* ── Summary strip (only when filters active) ────── */}
+        {/* ── Summary strip ────────────────────────────────── */}
         {hasActiveFilters && filtered.length > 0 && (
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-center">
