@@ -20,6 +20,7 @@ import inventoryRoutes from './routes/inventoryRoutes';
 import posRoutes from './routes/posRoutes';
 import reportsRoutes from './routes/reportsRoutes';
 import userRoutes from './routes/userRoutes';
+import syncRoutes from './routes/syncRoutes';
 
 dotenv.config(); // Load .env variables into process.env
 
@@ -89,6 +90,7 @@ app.use('/api/inventory', inventoryRoutes); // CRUD /api/inventory/transactions
 app.use('/api/pos', posRoutes); // GET /api/pos/products, POST /api/pos/sales
 app.use('/api/reports', reportsRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/sync', syncRoutes);
 
 /**
  * Root route — API documentation/discovery.
