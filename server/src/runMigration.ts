@@ -44,6 +44,8 @@ const runMigration = async () => {
       migrationFiles = fs
         .readdirSync(migrationsDir)
         .filter((f) => f.endsWith('.sql'))
+        // Never run rollback scripts during normal migrate flow.
+        .filter((f) => !f.toLowerCase().includes('rollback'))
         .sort(); // alphabetical = 001 before 002 before 003
     }
 
