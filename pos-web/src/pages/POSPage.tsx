@@ -70,10 +70,10 @@ export default function POSPage() {
    * Silent refresh updates the data without visible loading state.
    */
   useSocket({
-    'stock:updated': (data) => {
+    'stock:updated': (_data) => {
       loadProducts(true); // silent refresh
     },
-    'sale:created': (data) => {
+    'sale:created': (_data) => {
       // Only refresh if the sale wasn't from this session
       // (this cashier's sale already updated via cart clear)
       loadProducts(true);
