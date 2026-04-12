@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { dashboardAPI, inventoryAPI, reportsAPI } from '../services/api';
 import { Layout } from '../components/Layout';
@@ -9,12 +9,14 @@ import {
   TopProductsChart,
 } from '../components/Dashboard/Index';
 import { RevenueChart } from '../components/Dashboard/RevenueChart';
+import { useSocket } from '../hooks/useSocket';
 import type { DashboardData } from '../types/dashboard';
 import { useAuth } from '../context/AuthContext';
 import { useRole } from '../hooks/useRole';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TrendingUp, Plus, ArrowRight, AlertTriangle } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const formatPeso = (value: number, currency = 'PHP') =>
   value.toLocaleString('en-US', { style: 'currency', currency });
@@ -49,43 +51,70 @@ export const DashboardPage: React.FC = () => {
   const { canViewReports } = useRole();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchStats = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
-
       const [statsData, recentData, lowStockData] = await Promise.all([
         dashboardAPI.getStats(),
         inventoryAPI.getRecentTransactions(10),
         inventoryAPI.getLowStock(),
       ]);
-
       setDashboardData(statsData);
       setRecentActivity(recentData.transactions || recentData);
       setLowStockProducts(lowStockData.low_stock_products || lowStockData);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load dashboard data');
-    } finally {
-      setLoading(false);
     }
+  }, []);
 
-    // Fetch chart separately so it doesn't block the main dashboard
-    if (canViewReports) {
-      try {
-        setChartLoading(true);
-        const chart = await reportsAPI.getRevenueChart(30);
-        setRevenueData(chart);
-      } catch {
-        // Chart failure is non-critical — don't block the whole dashboard
-      } finally {
-        setChartLoading(false);
-      }
+  const fetchChart = useCallback(async () => {
+    if (!canViewReports) return;
+    try {
+      setChartLoading(true);
+      const chart = await reportsAPI.getRevenueChart(30);
+      setRevenueData(chart);
+    } catch {
+      // chart failure is non-critical
+    } finally {
+      setChartLoading(false);
     }
-  };
+  }, [canViewReports]);
+
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    await fetchStats();
+    setLoading(false);
+    await fetchChart();
+  }, [fetchStats, fetchChart]);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  /**
+   * Real-time updates via Socket.io
+   *
+   * 'sale:created' — emitted by posController when a POS sale completes.
+   * We refetch stats + chart so the dashboard reflects the new revenue
+   * without the user having to refresh.
+   *
+   * WHY refetch instead of updating state directly from the event payload?
+   * The event only carries the sale data, not the recalculated totals,
+   * top products, or updated stock levels. A refetch is simpler and ensures
+   * the dashboard is always in sync with the database.
+   */
+  useSocket({
+    'sale:created': (data) => {
+      toast.success(`New sale — ₱${Number(data.total_amount).toFixed(2)}`, {
+        icon: '🧾',
+      });
+      fetchStats();
+      if (canViewReports) fetchChart();
+    },
+    'stock:updated': () => {
+      fetchStats(); // low stock count may have changed
+    },
+  });
 
   if (loading) {
     return (
@@ -119,7 +148,7 @@ export const DashboardPage: React.FC = () => {
   return (
     <Layout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* ── Greeting + Quick actions ─────────────────────── */}
+        {/* Greeting + Quick actions */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
@@ -146,7 +175,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Low stock banner ─────────────────────────────── */}
+        {/* Low stock banner */}
         {lowStockCount > 0 && (
           <button
             onClick={() => navigate('/inventory')}
@@ -173,17 +202,17 @@ export const DashboardPage: React.FC = () => {
           </button>
         )}
 
-        {/* ── Overview cards ───────────────────────────────── */}
+        {/* Overview cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {dashboardData && <OverviewCards stats={dashboardData} />}
         </div>
 
-        {/* ── Revenue chart (admin/manager only) ───────────── */}
+        {/* Revenue chart */}
         {canViewReports && (
           <RevenueChart data={revenueData} loading={chartLoading} />
         )}
 
-        {/* ── Inventory value banner ────────────────────────── */}
+        {/* Inventory value */}
         {dashboardData && (
           <Card className="bg-slate-900 border-slate-900 text-white overflow-hidden">
             <CardContent className="p-6">
@@ -210,13 +239,13 @@ export const DashboardPage: React.FC = () => {
           </Card>
         )}
 
-        {/* ── Recent activity + Top products ───────────────── */}
+        {/* Recent activity + Top products */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <RecentActivity transactions={recentActivity} />
           <TopProductsChart products={dashboardData?.top_products || []} />
         </div>
 
-        {/* ── Low stock detail ─────────────────────────────── */}
+        {/* Low stock detail */}
         <LowStockAlert products={lowStockProducts} />
       </div>
     </Layout>

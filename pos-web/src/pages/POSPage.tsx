@@ -1,30 +1,8 @@
-/**
- * POSPage.tsx
- *
- * Main cashier screen — designed for all devices and all users including
- * elderly and non-tech-savvy cashiers.
- *
- * Layout:
- *   Mobile  — tab-based: "Products" tab | "Cart" tab
- *   Desktop — split panel: products left, cart right
- *
- * Design principles:
- *   - Large touch targets (minimum 48px)
- *   - Clear labels on everything — no icon-only buttons
- *   - High contrast text
- *   - Obvious feedback on every action
- *   - Cart badge always visible so cashier knows items are added
- *
- * CATEGORY FILTER:
- * Buttons extracted from the loaded product list — no extra API call needed.
- * Works together with the search box: search narrows by name/SKU,
- * category filter narrows by category. Both can be active at once.
- */
-
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../hooks/useCart';
+import { useSocket } from '../hooks/useSocket';
 import { productAPI } from '../services/api';
 import { formatPeso } from '../utils/format';
 import type { Product } from '../types';
@@ -55,13 +33,13 @@ export default function POSPage() {
     subtotal,
   } = useCart();
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  async function loadProducts() {
+  /**
+   * loadProducts as useCallback so useSocket can call it
+   * without recreating the function on every render.
+   */
+  const loadProducts = useCallback(async (silent = false) => {
     try {
-      setLoadingProducts(true);
+      if (!silent) setLoadingProducts(true);
       const data = await productAPI.getAll();
       setProducts(data);
     } catch {
@@ -69,19 +47,39 @@ export default function POSPage() {
     } finally {
       setLoadingProducts(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   /**
-   * categories — derived from the loaded products.
+   * Real-time listeners via Socket.io
    *
-   * WHY useMemo?
-   * Products don't change after load. Without memoization, this would
-   * recalculate on every render (every keystroke in the search box).
-   * useMemo caches the result and only recalculates when `products` changes.
+   * 'stock:updated' — fires when STOCKER admin adds a manual transaction.
+   * Silently refreshes the product list so stock counts stay current.
+   * Cashier sees updated stock without needing to refresh the page.
    *
-   * WHY 'All' prepended?
-   * 'All' is the default state — shows every product regardless of category.
+   * 'sale:created' — fires when ANY sale is completed (including this cashier's).
+   * If another cashier is using the system simultaneously, their sales
+   * would reduce stock. Silent refresh keeps this cashier's view accurate.
+   *
+   * WHY silent=true?
+   * We don't want the product grid to flash or show a loading spinner
+   * on every background refresh — that would be jarring mid-transaction.
+   * Silent refresh updates the data without visible loading state.
    */
+  useSocket({
+    'stock:updated': (data) => {
+      loadProducts(true); // silent refresh
+    },
+    'sale:created': (data) => {
+      // Only refresh if the sale wasn't from this session
+      // (this cashier's sale already updated via cart clear)
+      loadProducts(true);
+    },
+  });
+
   const categories = useMemo(() => {
     const unique = Array.from(
       new Set(products.map((p) => p.category_name).filter(Boolean)),
@@ -89,26 +87,16 @@ export default function POSPage() {
     return ['All', ...unique];
   }, [products]);
 
-  /**
-   * filteredProducts — applies both search and category filter together.
-   *
-   * WHY useMemo instead of useEffect + setState?
-   * filteredProducts is derived state — it's always computed from
-   * products + search + selectedCategory. Using useMemo avoids the extra
-   * render cycle that useState would cause.
-   */
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const matchesCategory =
         selectedCategory === 'All' || p.category_name === selectedCategory;
-
       const q = search.toLowerCase().trim();
       const matchesSearch =
         !q ||
         p.name?.toLowerCase().includes(q) ||
         p.sku?.toLowerCase().includes(q) ||
         p.category_name?.toLowerCase().includes(q);
-
       return matchesCategory && matchesSearch;
     });
   }, [products, search, selectedCategory]);
@@ -159,7 +147,7 @@ export default function POSPage() {
         </div>
       </header>
 
-      {/* ── MOBILE TAB BAR (hidden on md+) ──────────────────── */}
+      {/* ── MOBILE TAB BAR ──────────────────────────────────── */}
       <div className="md:hidden flex bg-white border-b border-gray-200 flex-shrink-0">
         <button
           onClick={() => setActiveTab('products')}
@@ -190,17 +178,12 @@ export default function POSPage() {
 
       {/* ── MAIN CONTENT ────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* ── PRODUCTS PANEL ────────────────────────────────── */}
+        {/* ── PRODUCTS PANEL ──────────────────────────────────── */}
         <div
-          className={`
-            flex-1 flex-col overflow-hidden border-r border-gray-200
-            ${activeTab === 'products' ? 'flex' : 'hidden'}
-            md:flex
-          `}
+          className={`flex-1 flex-col overflow-hidden border-r border-gray-200 ${activeTab === 'products' ? 'flex' : 'hidden'} md:flex`}
         >
           {/* Search + Category filter */}
           <div className="bg-white border-b border-gray-200">
-            {/* Search box */}
             <div className="p-3 pb-2">
               <input
                 type="text"
@@ -211,17 +194,6 @@ export default function POSPage() {
               />
             </div>
 
-            {/**
-             * Category filter buttons
-             *
-             * WHY horizontal scroll instead of wrapping?
-             * On mobile the buttons would push the product grid down and
-             * reduce visible products. Horizontal scroll keeps the layout
-             * compact and predictable regardless of how many categories exist.
-             *
-             * Only rendered once products have loaded (categories would be
-             * empty and show nothing useful during loading anyway).
-             */}
             {!loadingProducts && categories.length > 1 && (
               <div className="flex gap-2 px-3 pb-3 overflow-x-auto scrollbar-hide">
                 {categories.map((cat) => (
@@ -235,17 +207,8 @@ export default function POSPage() {
                     }`}
                   >
                     {cat}
-                    {/**
-                     * Show product count per category so cashiers know
-                     * how many items are in each section before clicking.
-                     * 'All' shows total count across all categories.
-                     */}
                     <span
-                      className={`ml-1.5 text-xs ${
-                        selectedCategory === cat
-                          ? 'text-green-100'
-                          : 'text-gray-400'
-                      }`}
+                      className={`ml-1.5 text-xs ${selectedCategory === cat ? 'text-green-100' : 'text-gray-400'}`}
                     >
                       {cat === 'All'
                         ? products.length
@@ -272,10 +235,6 @@ export default function POSPage() {
                     ? `No products found for "${search}"`
                     : `No products in ${selectedCategory}`}
                 </p>
-                {/**
-                 * Reset button — shown when filters produce empty results.
-                 * Gives the cashier a quick escape hatch back to all products.
-                 */}
                 {(search || selectedCategory !== 'All') && (
                   <button
                     onClick={() => {
@@ -301,7 +260,7 @@ export default function POSPage() {
             )}
           </div>
 
-          {/* Mobile — "View Cart" floating bar when items exist */}
+          {/* Mobile — "View Cart" floating bar */}
           {items.length > 0 && (
             <div className="md:hidden p-3 bg-white border-t border-gray-200 flex-shrink-0">
               <button
@@ -318,13 +277,9 @@ export default function POSPage() {
           )}
         </div>
 
-        {/* ── CART PANEL ────────────────────────────────────── */}
+        {/* ── CART PANEL ──────────────────────────────────────── */}
         <div
-          className={`
-            w-full md:w-80 xl:w-96 flex-col bg-white overflow-hidden
-            ${activeTab === 'cart' ? 'flex' : 'hidden'}
-            md:flex
-          `}
+          className={`w-full md:w-80 xl:w-96 flex-col bg-white overflow-hidden ${activeTab === 'cart' ? 'flex' : 'hidden'} md:flex`}
         >
           {/* Cart header */}
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
@@ -423,7 +378,7 @@ export default function POSPage() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// ProductCard — large touch target, clear stock status
+// ProductCard
 // ─────────────────────────────────────────────────────────────
 interface ProductCardProps {
   product: Product;
@@ -465,13 +420,7 @@ function ProductCard({ product, onAdd }: ProductCardProps) {
             {product.unit_of_measure}
           </span>
           <span
-            className={`text-xs font-medium ${
-              outOfStock
-                ? 'text-red-500'
-                : lowStock
-                  ? 'text-amber-500'
-                  : 'text-gray-400'
-            }`}
+            className={`text-xs font-medium ${outOfStock ? 'text-red-500' : lowStock ? 'text-amber-500' : 'text-gray-400'}`}
           >
             {outOfStock
               ? 'No stock'
@@ -486,7 +435,7 @@ function ProductCard({ product, onAdd }: ProductCardProps) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// CartRow — large controls, easy for non-tech-savvy users
+// CartRow
 // ─────────────────────────────────────────────────────────────
 interface CartRowProps {
   item: {
