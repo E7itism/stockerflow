@@ -16,7 +16,7 @@ import userRoutes from './routes/userRoutes';
 
 dotenv.config();
 
-const app = express();
+const app  = express();
 const httpServer = createServer(app); // wrap Express in an HTTP server so Socket.io can attach
 const PORT = process.env.PORT || 5000;
 
@@ -33,10 +33,7 @@ export const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-      if (
-        origin.startsWith('http://localhost') ||
-        origin.endsWith('.vercel.app')
-      ) {
+      if (origin.startsWith('http://localhost') || origin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
       return callback(new Error('Not allowed by CORS'));
@@ -56,10 +53,7 @@ io.on('connection', (socket) => {
 const corsOptions = {
   origin: function (origin: string | undefined, callback: Function) {
     if (!origin) return callback(null, true);
-    if (
-      origin.startsWith('http://localhost') ||
-      origin.endsWith('.vercel.app')
-    ) {
+    if (origin.startsWith('http://localhost') || origin.endsWith('.vercel.app')) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));
@@ -72,15 +66,15 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
+app.use('/api/auth',      authRoutes);
+app.use('/api/products',  productRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/inventory', inventoryRoutes);
-app.use('/api/pos', posRoutes);
-app.use('/api/reports', reportsRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/pos',       posRoutes);
+app.use('/api/reports',   reportsRoutes);
+app.use('/api/users',     userRoutes);
 
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'Stocker API', socket: 'enabled' });
