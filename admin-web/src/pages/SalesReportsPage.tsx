@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Layout } from '../components/Layout';
 import { reportsAPI } from '../services/api';
+import { useSocket } from '../hooks/useSocket';
 import type { ReportSummary, SaleRecord, SaleItem } from '../services/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,10 +25,6 @@ import {
   User,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-// ─────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────
 
 const formatPeso = (value: number | string): string =>
   `₱${Number(value).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -97,11 +94,7 @@ const getPresetRange = (preset: Preset): { from: string; to: string } => {
 const medals = ['🥇', '🥈', '🥉'];
 
 const inputClass =
-  'border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none w-full';
-
-// ─────────────────────────────────────────────
-// COMPONENT
-// ─────────────────────────────────────────────
+  'border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none';
 
 export const SalesReportsPage: React.FC = () => {
   const [preset, setPreset] = useState<Preset>('month');
@@ -162,6 +155,27 @@ export const SalesReportsPage: React.FC = () => {
     fetchSummary();
     fetchSales(1);
   }, [fetchSummary, fetchSales]);
+
+  /**
+   * Real-time listener
+   *
+   * 'sale:created' — a POS sale just completed.
+   * Refetch summary (totals change) and sales list (new row appears).
+   * Only refetch if the new sale falls within the current date filter.
+   *
+   * WHY check the date?
+   * If the user is viewing last month's data, a new sale today shouldn't
+   * reset their view. Only refresh if today is within the selected range.
+   */
+  useSocket({
+    'sale:created': (_data) => {
+      const today = toDateInput(new Date());
+      if (today >= dateFrom && today <= dateTo) {
+        fetchSummary();
+        fetchSales(currentPage);
+      }
+    },
+  });
 
   const handleRowClick = async (saleId: number) => {
     if (expandedSaleId === saleId) {
@@ -272,7 +286,7 @@ export const SalesReportsPage: React.FC = () => {
   return (
     <Layout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* ── Header ──────────────────────────────────── */}
+        {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Sales Reports</h1>
@@ -296,10 +310,9 @@ export const SalesReportsPage: React.FC = () => {
           </Button>
         </div>
 
-        {/* ── Date filter ─────────────────────────────── */}
+        {/* Date filter */}
         <Card>
           <CardContent className="p-4 space-y-3">
-            {/* Preset buttons */}
             <div className="flex gap-2 flex-wrap">
               {(['today', 'week', 'month'] as const).map((p) => (
                 <Button
@@ -319,8 +332,6 @@ export const SalesReportsPage: React.FC = () => {
                 </Button>
               ))}
             </div>
-
-            {/* Date inputs — full width, stacked on mobile */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-500">
@@ -333,7 +344,7 @@ export const SalesReportsPage: React.FC = () => {
                     setPreset('custom');
                     setDateFrom(e.target.value);
                   }}
-                  className={inputClass}
+                  className={`${inputClass} w-full`}
                 />
               </div>
               <div className="space-y-1">
@@ -345,14 +356,14 @@ export const SalesReportsPage: React.FC = () => {
                     setPreset('custom');
                     setDateTo(e.target.value);
                   }}
-                  className={inputClass}
+                  className={`${inputClass} w-full`}
                 />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* ── Summary cards ───────────────────────────── */}
+        {/* Summary cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
             {
@@ -407,7 +418,7 @@ export const SalesReportsPage: React.FC = () => {
           })}
         </div>
 
-        {/* ── Top products — full width ────────────────── */}
+        {/* Top products */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -466,7 +477,7 @@ export const SalesReportsPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* ── Transactions ────────────────────────────── */}
+        {/* Transactions */}
         <Card className="overflow-hidden">
           <div className="px-5 py-3 border-b bg-slate-50 flex items-center justify-between">
             <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -544,7 +555,6 @@ export const SalesReportsPage: React.FC = () => {
                             )}
                           </TableCell>
                         </TableRow>
-
                         {expandedSaleId === sale.id && (
                           <TableRow key={`${sale.id}-items`}>
                             <TableCell colSpan={5} className="p-0 bg-slate-50">
@@ -615,7 +625,6 @@ export const SalesReportsPage: React.FC = () => {
               <div className="md:hidden divide-y divide-slate-100">
                 {sales.map((sale) => (
                   <div key={sale.id}>
-                    {/* Sale card */}
                     <button
                       onClick={() => handleRowClick(sale.id)}
                       className={`w-full text-left px-4 py-4 hover:bg-slate-50 transition-colors ${expandedSaleId === sale.id ? 'bg-blue-50/30' : ''}`}
@@ -660,8 +669,6 @@ export const SalesReportsPage: React.FC = () => {
                         </span>
                       </div>
                     </button>
-
-                    {/* Expanded items on mobile */}
                     {expandedSaleId === sale.id && (
                       <div className="px-4 pb-4 bg-slate-50">
                         {itemsLoading && !expandedItems[sale.id] ? (

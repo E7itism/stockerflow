@@ -1,6 +1,7 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { inventoryAPI, productsAPI, categoriesAPI } from '../services/api';
 import { Layout } from '../components/Layout';
+import { useSocket } from '../hooks/useSocket';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -101,20 +102,19 @@ export const InventoryPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
 
-  // ── Filters ───────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  /**
+   * fetchData as useCallback so useSocket handlers can call it
+   * without the function reference changing on every render.
+   */
+  const fetchData = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const [txData, prodData, catData] = await Promise.all([
         inventoryAPI.getAllTransactions(),
@@ -127,15 +127,33 @@ export const InventoryPage: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load inventory data');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   /**
-   * productCategoryMap — maps product_id → category_id for fast lookup.
-   * WHY a Map? O(1) lookup per transaction instead of O(n) array.find().
-   * Built once from products, reused for every transaction in the filter.
+   * Real-time listeners
+   *
+   * 'stock:updated' — admin added a manual transaction.
+   * Silently refetch so the new row appears in the list immediately.
+   *
+   * 'sale:created' — POS completed a sale.
+   * Each sold item creates an 'out' transaction in inventory.
+   * Silent refetch brings those rows in without a loading flash.
    */
+  useSocket({
+    'stock:updated': (_data) => {
+      fetchData(true);
+    },
+    'sale:created': (_data) => {
+      fetchData(true);
+    },
+  });
+
   const productCategoryMap = useMemo(() => {
     const map = new Map<number, number>();
     products.forEach((p) => map.set(p.id, p.category_id));
@@ -144,7 +162,6 @@ export const InventoryPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {
-      // Search — product name, SKU, or user name
       if (search.trim()) {
         const q = search.toLowerCase();
         if (
@@ -154,18 +171,12 @@ export const InventoryPage: React.FC = () => {
         )
           return false;
       }
-
-      // Transaction type
       if (filterType !== 'all' && t.transaction_type !== filterType)
         return false;
-
-      // Category — look up the product's category from the map
       if (filterCategory !== 'all') {
         const catId = productCategoryMap.get(t.product_id);
         if (catId?.toString() !== filterCategory) return false;
       }
-
-      // Date range
       if (filterFrom) {
         const txDate = new Date(t.created_at).toISOString().split('T')[0];
         if (txDate < filterFrom) return false;
@@ -174,7 +185,6 @@ export const InventoryPage: React.FC = () => {
         const txDate = new Date(t.created_at).toISOString().split('T')[0];
         if (txDate > filterTo) return false;
       }
-
       return true;
     });
   }, [
@@ -219,7 +229,6 @@ export const InventoryPage: React.FC = () => {
   return (
     <Layout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* ── Header ──────────────────────────────────────── */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Inventory</h1>
@@ -235,10 +244,8 @@ export const InventoryPage: React.FC = () => {
           </Button>
         </div>
 
-        {/* ── Filters ─────────────────────────────────────── */}
         <Card>
           <CardContent className="p-4 space-y-3">
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
@@ -248,10 +255,7 @@ export const InventoryPage: React.FC = () => {
                 className="pl-9 h-10"
               />
             </div>
-
-            {/* Type + Category + Date range */}
             <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-              {/* Transaction type */}
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
@@ -262,8 +266,6 @@ export const InventoryPage: React.FC = () => {
                 <option value="out">Stock Out</option>
                 <option value="adjustment">Adjustment</option>
               </select>
-
-              {/* Category filter */}
               <select
                 value={filterCategory}
                 onChange={(e) => setFilterCategory(e.target.value)}
@@ -276,8 +278,6 @@ export const InventoryPage: React.FC = () => {
                   </option>
                 ))}
               </select>
-
-              {/* Date range */}
               <div className="flex items-center gap-2 flex-1">
                 <div className="space-y-0.5 flex-1">
                   <label className="text-xs text-slate-500 ml-1">From</label>
@@ -299,8 +299,6 @@ export const InventoryPage: React.FC = () => {
                   />
                 </div>
               </div>
-
-              {/* Clear */}
               {hasActiveFilters && (
                 <Button
                   variant="outline"
@@ -315,7 +313,6 @@ export const InventoryPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* ── Summary strip ────────────────────────────────── */}
         {hasActiveFilters && filtered.length > 0 && (
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-center">
@@ -337,7 +334,6 @@ export const InventoryPage: React.FC = () => {
           </div>
         )}
 
-        {/* ── Content ─────────────────────────────────────── */}
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
@@ -345,7 +341,7 @@ export const InventoryPage: React.FC = () => {
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm flex items-center justify-between">
             <span>{error}</span>
-            <Button variant="outline" size="sm" onClick={fetchData}>
+            <Button variant="outline" size="sm" onClick={() => fetchData()}>
               Retry
             </Button>
           </div>
@@ -373,7 +369,6 @@ export const InventoryPage: React.FC = () => {
           </Card>
         ) : (
           <>
-            {/* Desktop table */}
             <div className="hidden md:block">
               <Card className="overflow-hidden">
                 <Table>
@@ -447,7 +442,6 @@ export const InventoryPage: React.FC = () => {
               </Card>
             </div>
 
-            {/* Mobile cards */}
             <div className="md:hidden space-y-3">
               {filtered.map((t) => {
                 const config = typeConfig[t.transaction_type];
@@ -515,10 +509,6 @@ export const InventoryPage: React.FC = () => {
     </Layout>
   );
 };
-
-// ─────────────────────────────────────────────
-// TRANSACTION MODAL
-// ─────────────────────────────────────────────
 
 interface ModalProps {
   products: Product[];

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { productsAPI, categoriesAPI, suppliersAPI } from '../services/api';
 import { Layout } from '../components/Layout';
 import { ProductModal } from '../components/Products/ProductModal';
 import { useRole } from '../hooks/useRole';
+import { useSocket } from '../hooks/useSocket';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -84,13 +85,9 @@ export const ProductsPage: React.FC = () => {
 
   const { canEdit, canDelete } = useRole();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const [productsData, categoriesData, suppliersData] = await Promise.all([
         productsAPI.getAll(),
@@ -116,9 +113,32 @@ export const ProductsPage: React.FC = () => {
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load products');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  /**
+   * Real-time listeners
+   *
+   * 'sale:created' — a POS sale reduces stock via inventory_transactions.
+   * Silent refetch updates the stock count badges on each product row
+   * so admins can see the current stock without refreshing.
+   *
+   * 'stock:updated' — a manual transaction was added.
+   * Same reason — stock count badges need to reflect the new total.
+   */
+  useSocket({
+    'sale:created': (_data) => {
+      fetchData(true);
+    },
+    'stock:updated': (_data) => {
+      fetchData(true);
+    },
+  });
 
   const handleDeleteConfirm = async () => {
     if (!deleteId) return;
@@ -143,7 +163,6 @@ export const ProductsPage: React.FC = () => {
   return (
     <Layout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Products</h1>
@@ -164,7 +183,6 @@ export const ProductsPage: React.FC = () => {
           )}
         </div>
 
-        {/* Search */}
         <Card>
           <CardContent className="p-3">
             <div className="relative">
@@ -179,7 +197,6 @@ export const ProductsPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Content */}
         {loading ? (
           <div className="flex items-center justify-center py-24">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
@@ -187,7 +204,7 @@ export const ProductsPage: React.FC = () => {
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm flex items-center justify-between">
             <span>{error}</span>
-            <Button variant="outline" size="sm" onClick={fetchData}>
+            <Button variant="outline" size="sm" onClick={() => fetchData()}>
               Retry
             </Button>
           </div>
@@ -394,7 +411,6 @@ export const ProductsPage: React.FC = () => {
           </>
         )}
 
-        {/* Product modal */}
         {showModal && (
           <ProductModal
             product={editingProduct}
@@ -408,7 +424,6 @@ export const ProductsPage: React.FC = () => {
           />
         )}
 
-        {/* Delete confirmation */}
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>

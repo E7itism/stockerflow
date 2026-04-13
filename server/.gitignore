@@ -14,3 +14,7 @@ build/
 *.loggit add .gitignore
 git commit -m "fix: Remove node_modules from git, update gitignore"
 git push
+
+
+#AI prompt
+.cursorrules
