@@ -10,6 +10,7 @@ import {
   BarChart3,
   Users,
   Boxes,
+  ShoppingCart,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -28,6 +29,7 @@ const allMenuItems: MenuItem[] = [
   { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/products', icon: Package, label: 'Products' },
   { path: '/inventory', icon: ClipboardList, label: 'Inventory' },
+  { path: '/pos', icon: ShoppingCart, label: 'POS' },
   {
     path: '/categories',
     icon: FolderOpen,
@@ -54,7 +56,10 @@ export const Sidebar: React.FC<Props> = ({ onLinkClick }) => {
   const location = useLocation();
   const { hasRole, role } = useRole();
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) =>
+    path === '/pos'
+      ? location.pathname.startsWith('/pos')
+      : location.pathname === path;
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -89,18 +94,23 @@ export const Sidebar: React.FC<Props> = ({ onLinkClick }) => {
         </p>
         {visibleMenuItems.map((item) => {
           const Icon = item.icon;
+          const active = isActive(item.path);
           return (
             <button
               key={item.path}
               onClick={() => handleNavigation(item.path)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
-                isActive(item.path)
+                active
                   ? 'bg-slate-900 text-white'
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               <span>{item.label}</span>
+              {/* Green dot on POS link so cashiers can spot it quickly */}
+              {item.path === '/pos' && !active && (
+                <span className="ml-auto w-2 h-2 rounded-full bg-green-400" />
+              )}
             </button>
           );
         })}

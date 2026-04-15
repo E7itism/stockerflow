@@ -13,6 +13,7 @@
 
 import axios from 'axios';
 import type { DashboardData } from '../types/dashboard';
+import type { POSProduct, CreateSalePayload, POSSale } from '../types/pos';
 
 /**
  * Base URL comes from environment variable.
@@ -436,6 +437,30 @@ export const usersAPI = {
       { is_active },
     );
     return response.data.user;
+  },
+};
+export const posAPI = {
+  getProducts: async (): Promise<POSProduct[]> => {
+    const response = await api.get('/pos/products');
+    return response.data.products;
+  },
+
+  createSale: async (payload: CreateSalePayload): Promise<POSSale> => {
+    const response = await api.post('/pos/sales', payload);
+    return response.data.sale;
+  },
+
+  getSaleById: async (id: number): Promise<POSSale> => {
+    const response = await api.get(`/pos/sales/${id}`);
+    return response.data.sale;
+  },
+
+  getSalesHistory: async (params?: {
+    from?: string;
+    to?: string;
+  }): Promise<POSSale[]> => {
+    const response = await api.get('/pos/sales', { params });
+    return response.data.sales;
   },
 };
 

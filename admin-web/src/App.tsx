@@ -1,30 +1,9 @@
-/**
- * APP.TSX - ROUTING SETUP
- *
- * WHAT THIS DOES:
- * - Defines all the routes (URLs) for your app
- * - Protects routes that need authentication
- * - Restricts routes by role using RoleProtectedRoute
- * - Wraps everything in AuthProvider for login state
- *
- * ROUTE PROTECTION LEVELS:
- * - Public          → anyone (login, register)
- * - ProtectedRoute  → must be logged in (dashboard, inventory, products)
- * - RoleProtectedRoute → must be logged in AND have the right role
- *
- * ROLE PERMISSIONS:
- * - /reports    → admin, manager
- * - /categories → admin, manager
- * - /suppliers  → admin, manager
- * - /users      → admin only (future)
- */
-
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RoleProtectedRoute } from './components/RoleProtectedRoute';
 
-// Import all pages
+// Admin pages
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -35,17 +14,20 @@ import { InventoryPage } from './pages/InventoryPage';
 import { SalesReportsPage } from './pages/SalesReportsPage';
 import { UsersPage } from './pages/UsersPage';
 
+// POS pages
+import { POSPage } from './pages/pos/POSPage';
+import { SalesHistoryPage } from './pages/pos/SalesHistoryPage';
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* ========== PUBLIC ROUTES ========== */}
+          {/* ── Public ────────────────────────────────── */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* ========== PROTECTED ROUTES (login required, any role) ========== */}
-
+          {/* ── All roles ─────────────────────────────── */}
           <Route
             path="/dashboard"
             element={
@@ -54,11 +36,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          {/**
-           * Products — all roles can VIEW
-           * Edit/Delete buttons inside are hidden by role (see ProductsPage)
-           */}
           <Route
             path="/products"
             element={
@@ -67,10 +44,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          {/**
-           * Inventory — all roles can add transactions and view stock
-           */}
           <Route
             path="/inventory"
             element={
@@ -80,12 +53,25 @@ function App() {
             }
           />
 
-          {/* ========== ROLE-PROTECTED ROUTES ========== */}
+          {/* ── POS — all roles (full-screen layout) ──── */}
+          <Route
+            path="/pos"
+            element={
+              <ProtectedRoute>
+                <POSPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pos/history"
+            element={
+              <ProtectedRoute>
+                <SalesHistoryPage />
+              </ProtectedRoute>
+            }
+          />
 
-          {/**
-           * Categories — admin and manager only
-           * Staff don't need to create/edit categories
-           */}
+          {/* ── Admin + Manager ───────────────────────── */}
           <Route
             path="/categories"
             element={
@@ -94,11 +80,6 @@ function App() {
               </RoleProtectedRoute>
             }
           />
-
-          {/**
-           * Suppliers — admin and manager only
-           * Supplier relationships are a management concern, not staff
-           */}
           <Route
             path="/suppliers"
             element={
@@ -107,11 +88,6 @@ function App() {
               </RoleProtectedRoute>
             }
           />
-
-          {/**
-           * Sales Reports — admin and manager only
-           * Revenue data is sensitive — staff don't need to see it
-           */}
           <Route
             path="/reports"
             element={
@@ -121,10 +97,7 @@ function App() {
             }
           />
 
-          {/**
-           * User Management — admin only
-           * Creating/deactivating accounts is the highest privilege
-           */}
+          {/* ── Admin only ────────────────────────────── */}
           <Route
             path="/users"
             element={
@@ -134,7 +107,6 @@ function App() {
             }
           />
 
-          {/* ========== DEFAULT ROUTE ========== */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
