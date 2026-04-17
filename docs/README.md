@@ -36,21 +36,6 @@ A full-stack inventory management and point-of-sale system built for small busin
 ### Products (Mobile)
 ![Products Mobile](screenshots/products-mobile.PNG)
 
-### POS — Product Browser
-![POS Products](screenshots/pos-products.PNG)
-
-### POS — Cart
-![POS Cart](screenshots/pos-cart.PNG)
-
-### POS — Checkout
-![POS Checkout](screenshots/pos-checkout.PNG)
-
-### POS — Receipt
-![POS Receipt](screenshots/pos-receipt.PNG)
-
-### POS — Mobile View
-![POS Mobile](screenshots/pos-mobile.PNG)
-
 ---
 
 ## Features
