@@ -10,6 +10,7 @@ import {
 } from '../components/Dashboard/Index';
 import { RevenueChart } from '../components/Dashboard/RevenueChart';
 import { useSocket } from '../hooks/useSocket';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { DashboardData } from '../types/dashboard';
 import { useAuth } from '../context/AuthContext';
 import { useRole } from '../hooks/useRole';
@@ -35,6 +36,86 @@ const formatDate = () =>
     month: 'long',
     day: 'numeric',
   });
+
+// ─────────────────────────────────────────────
+// SKELETON COMPONENTS — match exact layout
+// ─────────────────────────────────────────────
+
+const OverviewCardsSkeleton = () => (
+  <>
+    {[...Array(4)].map((_, i) => (
+      <Card key={i}>
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-8 w-16" />
+            </div>
+            <Skeleton className="h-11 w-11 rounded-xl flex-shrink-0" />
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </>
+);
+
+const InventoryValueSkeleton = () => (
+  <Card className="bg-slate-900 border-slate-900 overflow-hidden">
+    <CardContent className="p-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-3 w-40 bg-slate-700" />
+          <Skeleton className="h-10 w-48 bg-slate-700" />
+          <Skeleton className="h-3 w-56 bg-slate-700" />
+        </div>
+        <Skeleton className="h-16 w-16 rounded-xl bg-slate-800 flex-shrink-0" />
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const RecentActivitySkeleton = () => (
+  <Card>
+    <CardContent className="p-5 space-y-4">
+      <Skeleton className="h-5 w-32" />
+      {[...Array(5)].map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0"
+        >
+          <Skeleton className="h-8 w-8 rounded-lg flex-shrink-0" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-3.5 w-36" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+      ))}
+    </CardContent>
+  </Card>
+);
+
+const TopProductsSkeleton = () => (
+  <Card>
+    <CardContent className="p-5 space-y-4">
+      <Skeleton className="h-5 w-28" />
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-3.5 w-32" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+          <Skeleton className="h-1.5 w-full rounded-full" />
+          <Skeleton className="h-3 w-20 ml-auto" />
+        </div>
+      ))}
+    </CardContent>
+  </Card>
+);
+
+// ─────────────────────────────────────────────
+// PAGE
+// ─────────────────────────────────────────────
 
 export const DashboardPage: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(
@@ -73,7 +154,7 @@ export const DashboardPage: React.FC = () => {
       const chart = await reportsAPI.getRevenueChart(30);
       setRevenueData(chart);
     } catch {
-      // chart failure is non-critical
+      // non-critical
     } finally {
       setChartLoading(false);
     }
@@ -91,18 +172,6 @@ export const DashboardPage: React.FC = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  /**
-   * Real-time updates via Socket.io
-   *
-   * 'sale:created' — emitted by posController when a POS sale completes.
-   * We refetch stats + chart so the dashboard reflects the new revenue
-   * without the user having to refresh.
-   *
-   * WHY refetch instead of updating state directly from the event payload?
-   * The event only carries the sale data, not the recalculated totals,
-   * top products, or updated stock levels. A refetch is simpler and ensures
-   * the dashboard is always in sync with the database.
-   */
   useSocket({
     'sale:created': (data) => {
       toast.success(`New sale — ₱${Number(data.total_amount).toFixed(2)}`, {
@@ -112,19 +181,9 @@ export const DashboardPage: React.FC = () => {
       if (canViewReports) fetchChart();
     },
     'stock:updated': () => {
-      fetchStats(); // low stock count may have changed
+      fetchStats();
     },
   });
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-slate-900" />
-        </div>
-      </Layout>
-    );
-  }
 
   if (error) {
     return (
@@ -148,13 +207,22 @@ export const DashboardPage: React.FC = () => {
   return (
     <Layout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Greeting + Quick actions */}
+        {/* ── Greeting + Quick actions ─────────────────────── */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              {getGreeting()}, {user?.first_name} 👋
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">{formatDate()}</p>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-56" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+            ) : (
+              <>
+                <h1 className="text-2xl font-bold text-slate-900">
+                  {getGreeting()}, {user?.first_name} 👋
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">{formatDate()}</p>
+              </>
+            )}
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button
@@ -175,8 +243,8 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Low stock banner */}
-        {lowStockCount > 0 && (
+        {/* ── Low stock banner ─────────────────────────────── */}
+        {!loading && lowStockCount > 0 && (
           <button
             onClick={() => navigate('/inventory')}
             className="w-full text-left"
@@ -202,51 +270,68 @@ export const DashboardPage: React.FC = () => {
           </button>
         )}
 
-        {/* Overview cards */}
+        {/* ── Overview cards ───────────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {dashboardData && <OverviewCards stats={dashboardData} />}
+          {loading ? (
+            <OverviewCardsSkeleton />
+          ) : (
+            dashboardData && <OverviewCards stats={dashboardData} />
+          )}
         </div>
 
-        {/* Revenue chart */}
+        {/* ── Revenue chart ────────────────────────────────── */}
         {canViewReports && (
           <RevenueChart data={revenueData} loading={chartLoading} />
         )}
 
-        {/* Inventory value */}
-        {dashboardData && (
-          <Card className="bg-slate-900 border-slate-900 text-white overflow-hidden">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">
-                    Total Inventory Value
-                  </p>
-                  <p className="text-3xl sm:text-4xl font-bold mt-2 text-white">
-                    {formatPeso(
-                      dashboardData.inventory_value?.total_value || 0,
-                      dashboardData.inventory_value?.currency,
-                    )}
-                  </p>
-                  <p className="text-sm text-slate-400 mt-2">
-                    Across all products currently in stock
-                  </p>
+        {/* ── Inventory value banner ────────────────────────── */}
+        {loading ? (
+          <InventoryValueSkeleton />
+        ) : (
+          dashboardData && (
+            <Card className="bg-slate-900 border-slate-900 text-white overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+                      Total Inventory Value
+                    </p>
+                    <p className="text-3xl sm:text-4xl font-bold mt-2 text-white">
+                      {formatPeso(
+                        dashboardData.inventory_value?.total_value || 0,
+                        dashboardData.inventory_value?.currency,
+                      )}
+                    </p>
+                    <p className="text-sm text-slate-400 mt-2">
+                      Across all products currently in stock
+                    </p>
+                  </div>
+                  <div className="bg-slate-800 p-4 rounded-xl flex-shrink-0">
+                    <TrendingUp className="w-8 h-8 text-emerald-400" />
+                  </div>
                 </div>
-                <div className="bg-slate-800 p-4 rounded-xl flex-shrink-0">
-                  <TrendingUp className="w-8 h-8 text-emerald-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )
         )}
 
-        {/* Recent activity + Top products */}
+        {/* ── Recent activity + Top products ───────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <RecentActivity transactions={recentActivity} />
-          <TopProductsChart products={dashboardData?.top_products || []} />
+          {loading ? (
+            <>
+              <RecentActivitySkeleton />
+              <TopProductsSkeleton />
+            </>
+          ) : (
+            <>
+              <RecentActivity transactions={recentActivity} />
+              <TopProductsChart products={dashboardData?.top_products || []} />
+            </>
+          )}
         </div>
 
-        {/* Low stock detail */}
-        <LowStockAlert products={lowStockProducts} />
+        {/* ── Low stock detail ─────────────────────────────── */}
+        {!loading && <LowStockAlert products={lowStockProducts} />}
       </div>
     </Layout>
   );
