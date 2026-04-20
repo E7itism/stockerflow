@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -45,7 +46,6 @@ export interface Product {
   created_at?: string;
   updated_at?: string;
 }
-
 interface Category {
   id: number;
   name: string;
@@ -71,6 +71,85 @@ const getStockBadge = (stock: number, reorderLevel: number) => {
     class: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   };
 };
+
+// ── Skeleton ──────────────────────────────────
+const TableSkeleton = () => (
+  <Card className="overflow-hidden">
+    <Table>
+      <TableHeader>
+        <TableRow className="bg-slate-50">
+          {['SKU', 'Name', 'Category', 'Unit', 'Price', 'Stock', 'Actions'].map(
+            (h) => (
+              <TableHead key={h} className="text-xs uppercase tracking-wider">
+                {h}
+              </TableHead>
+            ),
+          )}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {[...Array(6)].map((_, i) => (
+          <TableRow key={i}>
+            <TableCell>
+              <Skeleton className="h-3.5 w-20" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-32" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-24" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-16" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-16 ml-auto" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-5 w-16 rounded-full mx-auto" />
+            </TableCell>
+            <TableCell>
+              <div className="flex justify-center gap-1.5">
+                <Skeleton className="h-7 w-10 rounded-md" />
+                <Skeleton className="h-7 w-14 rounded-md" />
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </Card>
+);
+
+const CardsSkeleton = () => (
+  <div className="space-y-3">
+    {[...Array(4)].map((_, i) => (
+      <Card key={i}>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1.5">
+              <Skeleton className="h-4 w-36" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="h-5 w-16 rounded-full" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {[...Array(4)].map((_, j) => (
+              <div key={j} className="space-y-1">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-3.5 w-24" />
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-8 flex-1 rounded-md" />
+            <Skeleton className="h-8 flex-1 rounded-md" />
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
 
 export const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -98,14 +177,14 @@ export const ProductsPage: React.FC = () => {
       const suppliersList = suppliersData.suppliers || suppliersData;
       const productsList = productsData.products || productsData;
       setProducts(
-        productsList.map((product: Product) => ({
-          ...product,
+        productsList.map((p: Product) => ({
+          ...p,
           category_name:
-            categoriesList.find((c: Category) => c.id === product.category_id)
+            categoriesList.find((c: Category) => c.id === p.category_id)
               ?.name || '-',
           supplier_name:
-            suppliersList.find((s: Supplier) => s.id === product.supplier_id)
-              ?.name || '-',
+            suppliersList.find((s: Supplier) => s.id === p.supplier_id)?.name ||
+            '-',
         })),
       );
       setCategories(categoriesList);
@@ -121,16 +200,6 @@ export const ProductsPage: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  /**
-   * Real-time listeners
-   *
-   * 'sale:created' — a POS sale reduces stock via inventory_transactions.
-   * Silent refetch updates the stock count badges on each product row
-   * so admins can see the current stock without refreshing.
-   *
-   * 'stock:updated' — a manual transaction was added.
-   * Same reason — stock count badges need to reflect the new total.
-   */
   useSocket({
     'sale:created': (_data) => {
       fetchData(true);
@@ -198,9 +267,14 @@ export const ProductsPage: React.FC = () => {
         </Card>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
-          </div>
+          <>
+            <div className="hidden md:block">
+              <TableSkeleton />
+            </div>
+            <div className="md:hidden">
+              <CardsSkeleton />
+            </div>
+          </>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm flex items-center justify-between">
             <span>{error}</span>
@@ -222,7 +296,6 @@ export const ProductsPage: React.FC = () => {
           </Card>
         ) : (
           <>
-            {/* Desktop table */}
             <div className="hidden md:block">
               <Card className="overflow-hidden">
                 <Table>
@@ -323,8 +396,6 @@ export const ProductsPage: React.FC = () => {
                 </Table>
               </Card>
             </div>
-
-            {/* Mobile cards */}
             <div className="md:hidden space-y-3">
               {filteredProducts.map((product) => {
                 const stock = getStockBadge(
