@@ -4,6 +4,7 @@ import { Layout } from '../components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -40,6 +41,61 @@ interface Category {
 
 const fieldClass =
   'w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none';
+
+const TableSkeleton = () => (
+  <Card className="overflow-hidden">
+    <Table>
+      <TableHeader>
+        <TableRow className="bg-slate-50">
+          <TableHead className="text-xs uppercase tracking-wider">
+            Name
+          </TableHead>
+          <TableHead className="text-xs uppercase tracking-wider">
+            Description
+          </TableHead>
+          <TableHead className="text-xs uppercase tracking-wider text-center">
+            Actions
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {[...Array(5)].map((_, i) => (
+          <TableRow key={i}>
+            <TableCell>
+              <Skeleton className="h-3.5 w-28" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-48" />
+            </TableCell>
+            <TableCell>
+              <div className="flex justify-center gap-1.5">
+                <Skeleton className="h-7 w-10 rounded-md" />
+                <Skeleton className="h-7 w-14 rounded-md" />
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </Card>
+);
+
+const CardsSkeleton = () => (
+  <div className="space-y-3">
+    {[...Array(4)].map((_, i) => (
+      <Card key={i}>
+        <CardContent className="p-4 space-y-3">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3.5 w-48" />
+          <div className="flex gap-2">
+            <Skeleton className="h-8 flex-1 rounded-md" />
+            <Skeleton className="h-8 flex-1 rounded-md" />
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
 
 export const CategoriesPage: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -122,9 +178,14 @@ export const CategoriesPage: React.FC = () => {
         </Card>
 
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
-          </div>
+          <>
+            <div className="hidden md:block">
+              <TableSkeleton />
+            </div>
+            <div className="md:hidden">
+              <CardsSkeleton />
+            </div>
+          </>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm flex items-center justify-between">
             <span>{error}</span>

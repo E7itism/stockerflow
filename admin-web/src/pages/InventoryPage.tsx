@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -42,7 +43,6 @@ interface Transaction {
   notes?: string;
   created_at: string;
 }
-
 interface Product {
   id: number;
   name: string;
@@ -51,7 +51,6 @@ interface Product {
   category_name?: string;
   current_stock?: number;
 }
-
 interface Category {
   id: number;
   name: string;
@@ -90,9 +89,74 @@ const formatDate = (d: string) =>
   });
 
 const toDateInput = (d: Date) => d.toISOString().split('T')[0];
-
 const fieldClass =
   'w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none';
+
+const TableSkeleton = () => (
+  <Card className="overflow-hidden">
+    <Table>
+      <TableHeader>
+        <TableRow className="bg-slate-50">
+          {['Date', 'Product', 'Type', 'Qty', 'User', 'Notes'].map((h) => (
+            <TableHead key={h} className="text-xs uppercase tracking-wider">
+              {h}
+            </TableHead>
+          ))}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {[...Array(7)].map((_, i) => (
+          <TableRow key={i}>
+            <TableCell>
+              <Skeleton className="h-3.5 w-24" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-32 mb-1" />
+              <Skeleton className="h-3 w-16" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-8 ml-auto" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-20" />
+            </TableCell>
+            <TableCell>
+              <Skeleton className="h-3.5 w-24" />
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </Card>
+);
+
+const CardsSkeleton = () => (
+  <div className="space-y-3">
+    {[...Array(5)].map((_, i) => (
+      <Card key={i}>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8 rounded-lg flex-shrink-0" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-3.5 w-32" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+            <Skeleton className="h-5 w-8" />
+          </div>
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-5 w-20 rounded-full" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
 
 export const InventoryPage: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -101,17 +165,12 @@ export const InventoryPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterFrom, setFilterFrom] = useState('');
   const [filterTo, setFilterTo] = useState('');
 
-  /**
-   * fetchData as useCallback so useSocket handlers can call it
-   * without the function reference changing on every render.
-   */
   const fetchData = useCallback(async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -135,16 +194,6 @@ export const InventoryPage: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
-  /**
-   * Real-time listeners
-   *
-   * 'stock:updated' — admin added a manual transaction.
-   * Silently refetch so the new row appears in the list immediately.
-   *
-   * 'sale:created' — POS completed a sale.
-   * Each sold item creates an 'out' transaction in inventory.
-   * Silent refetch brings those rows in without a loading flash.
-   */
   useSocket({
     'stock:updated': (_data) => {
       fetchData(true);
@@ -160,42 +209,44 @@ export const InventoryPage: React.FC = () => {
     return map;
   }, [products]);
 
-  const filtered = useMemo(() => {
-    return transactions.filter((t) => {
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        if (
-          !t.product_name.toLowerCase().includes(q) &&
-          !t.sku.toLowerCase().includes(q) &&
-          !t.user_name.toLowerCase().includes(q)
-        )
+  const filtered = useMemo(
+    () =>
+      transactions.filter((t) => {
+        if (search.trim()) {
+          const q = search.toLowerCase();
+          if (
+            !t.product_name.toLowerCase().includes(q) &&
+            !t.sku.toLowerCase().includes(q) &&
+            !t.user_name.toLowerCase().includes(q)
+          )
+            return false;
+        }
+        if (filterType !== 'all' && t.transaction_type !== filterType)
           return false;
-      }
-      if (filterType !== 'all' && t.transaction_type !== filterType)
-        return false;
-      if (filterCategory !== 'all') {
-        const catId = productCategoryMap.get(t.product_id);
-        if (catId?.toString() !== filterCategory) return false;
-      }
-      if (filterFrom) {
-        const txDate = new Date(t.created_at).toISOString().split('T')[0];
-        if (txDate < filterFrom) return false;
-      }
-      if (filterTo) {
-        const txDate = new Date(t.created_at).toISOString().split('T')[0];
-        if (txDate > filterTo) return false;
-      }
-      return true;
-    });
-  }, [
-    transactions,
-    search,
-    filterType,
-    filterCategory,
-    filterFrom,
-    filterTo,
-    productCategoryMap,
-  ]);
+        if (filterCategory !== 'all') {
+          const catId = productCategoryMap.get(t.product_id);
+          if (catId?.toString() !== filterCategory) return false;
+        }
+        if (filterFrom) {
+          const txDate = new Date(t.created_at).toISOString().split('T')[0];
+          if (txDate < filterFrom) return false;
+        }
+        if (filterTo) {
+          const txDate = new Date(t.created_at).toISOString().split('T')[0];
+          if (txDate > filterTo) return false;
+        }
+        return true;
+      }),
+    [
+      transactions,
+      search,
+      filterType,
+      filterCategory,
+      filterFrom,
+      filterTo,
+      productCategoryMap,
+    ],
+  );
 
   const hasActiveFilters =
     search ||
@@ -335,9 +386,14 @@ export const InventoryPage: React.FC = () => {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900" />
-          </div>
+          <>
+            <div className="hidden md:block">
+              <TableSkeleton />
+            </div>
+            <div className="md:hidden">
+              <CardsSkeleton />
+            </div>
+          </>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm flex items-center justify-between">
             <span>{error}</span>
@@ -441,7 +497,6 @@ export const InventoryPage: React.FC = () => {
                 </Table>
               </Card>
             </div>
-
             <div className="md:hidden space-y-3">
               {filtered.map((t) => {
                 const config = typeConfig[t.transaction_type];
